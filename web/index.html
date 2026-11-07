@@ -3,82 +3,253 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Career fair choice</title>
+    <title>Saturday afternoon</title>
     <style>
       :root {
         color-scheme: light;
+        --ink: #1c1915;
+        --paper: #fffdf8;
+        --line: #1c1915;
+        --health: #c23b3b;
+        --happiness: #d4538a;
+        --money: #2f8f4e;
+        --energy: #2f5f8a;
         font-family: Georgia, "Times New Roman", serif;
-        background: #f4efe6;
-        color: #1c1915;
       }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0;
-        min-height: 100vh;
+        background: var(--paper);
+        color: var(--ink);
         display: grid;
-        place-items: center;
+        grid-template-columns: minmax(0, 1fr) 18rem;
+        grid-template-rows: minmax(0, 1fr) auto;
+        min-height: 100vh;
       }
-      main {
-        width: min(28rem, calc(100% - 2rem));
-        background: #fffdf8;
-        border: 1px solid #ded4c4;
-        border-radius: 12px;
-        padding: 1.5rem;
+      .game, .chat, .player, .choices {
+        border-color: var(--line);
+        border-style: solid;
+      }
+      .game {
+        grid-column: 1;
+        grid-row: 1;
+        border-width: 0 0 2px 0;
+        padding: 1.5rem 1.75rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .region {
+        margin: 0 0 0.4rem;
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
       h1 {
-        margin: 0 0 0.5rem;
-        font-size: 1.6rem;
+        margin: 0 0 0.6rem;
+        font-size: clamp(2rem, 5vw, 3.4rem);
+        font-weight: 500;
       }
-      p {
-        margin: 0 0 1rem;
+      .scene {
+        max-width: 36rem;
+        margin: 0;
+        line-height: 1.45;
+        font-size: 1.05rem;
+      }
+      .chat {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        border-width: 0 0 0 2px;
+        padding: 1rem 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .chat h2, .player h2, .choices h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 500;
+      }
+      #status, #reply {
+        margin: 0.8rem 0 0;
         line-height: 1.45;
       }
+      #reply { white-space: pre-wrap; }
+      .chat a {
+        margin-top: auto;
+        padding-top: 1rem;
+        color: var(--ink);
+      }
+      .dock {
+        grid-column: 1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
+        min-height: 15.5rem;
+      }
+      .player {
+        border-width: 0 2px 0 0;
+        padding: 0.85rem 1rem 1rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 8.5rem;
+        grid-template-rows: auto 1fr;
+        column-gap: 0.8rem;
+      }
+      .player h2 { grid-column: 1; grid-row: 1; align-self: start; }
+      .stats {
+        grid-column: 1;
+        grid-row: 2;
+        margin: 0.7rem 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .stat { display: flex; justify-content: space-between; gap: 1rem; }
+      .stat dt, .stat dd { margin: 0; font-size: 1.05rem; }
+      .stat dd { font-variant-numeric: tabular-nums; }
+      .health { color: var(--health); }
+      .happiness { color: var(--happiness); }
+      .money { color: var(--money); }
+      .energy { color: var(--energy); }
+      .side {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+        min-height: 0;
+      }
+      .icon, .inventory {
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .icon {
+        height: 4.6rem;
+        display: grid;
+        place-items: center;
+        gap: 0.1rem;
+      }
+      .icon span { font-size: 0.72rem; }
+      .inventory {
+        flex: 1;
+        min-height: 6.5rem;
+        display: grid;
+        place-items: center;
+        color: #6d675f;
+        font-size: 0.95rem;
+      }
+      .choices {
+        border-width: 0;
+        padding: 0.85rem 1.1rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+      }
+      .choices h2 { margin-bottom: 0.8rem; }
+      .choice-list { display: flex; flex-direction: column; gap: 0.65rem; }
       button {
         font: inherit;
-        font-size: 1rem;
-        background: #1c1915;
-        color: #fffdf8;
-        border: 0;
-        border-radius: 8px;
-        padding: 0.7rem 1rem;
+        text-align: left;
+        background: #fff;
+        color: var(--ink);
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        padding: 0.7rem 0.85rem;
         cursor: pointer;
-        margin: 0 0.4rem 0 0;
       }
-      button:disabled {
-        opacity: 0.6;
-        cursor: wait;
-      }
-      #status,
-      #reply {
-        min-height: 1.4rem;
-        margin: 1rem 0 0;
+      button strong { display: block; font-weight: 500; font-size: 1.05rem; }
+      button span { display: block; margin-top: 0.15rem; color: #5c564e; font-size: 0.92rem; }
+      button:hover:not(:disabled) { background: #f6f1e8; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      @media (max-width: 800px) {
+        body {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto auto;
+          height: auto;
+        }
+        .game { min-height: 14rem; }
+        .chat {
+          grid-column: 1;
+          grid-row: 3;
+          border-width: 2px 0 0 0;
+          min-height: 14rem;
+        }
+        .dock { grid-template-columns: 1fr; }
+        .player { border-width: 0 0 2px 0; }
       }
     </style>
   </head>
   <body>
-    <main>
+    <section class="game" aria-label="Game">
+      <p class="region">Game</p>
       <h1>Saturday afternoon</h1>
-      <p id="stats"></p>
-      <p>The career fair costs 1 energy and $8. Sam misses chemistry lab and meets a recruiter. A nap gives 1 energy back.</p>
-      <button id="career-fair" type="button">Go to the career fair</button>
-      <button id="nap" type="button">Take a nap</button>
-      <p id="status" role="status"></p>
+      <p class="scene">The career fair is across campus. Going costs 1 energy and $8: Sam misses chemistry lab and meets a recruiter. A nap stays in the room and gives 1 energy back.</p>
+    </section>
+    <aside class="chat" aria-label="Chat">
+      <h2>Chat</h2>
+      <p id="status" role="status">Captain will answer here.</p>
       <p id="reply"></p>
-      <p><a id="playground" href="http://127.0.0.1:3000/person1/playground">Open person 1's playground</a></p>
-    </main>
+      <a id="playground" href="http://127.0.0.1:3000/person1/playground">Open person 1's playground</a>
+    </aside>
+    <div class="dock">
+      <section class="player" aria-label="Player">
+        <h2>Player</h2>
+        <dl class="stats">
+          <div class="stat health"><dt>Health</dt><dd id="health">80</dd></div>
+          <div class="stat happiness"><dt>Happiness</dt><dd id="happiness">50</dd></div>
+          <div class="stat money"><dt>Money</dt><dd id="money">$40</dd></div>
+          <div class="stat energy"><dt>Energy</dt><dd id="energy">3/3</dd></div>
+        </dl>
+        <div class="side">
+          <div class="icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#1c1915" stroke-width="1.6">
+              <circle cx="14" cy="8" r="3.2"></circle>
+              <path d="M7 23c.8-4.2 3.2-6.2 7-6.2S20.2 18.8 21 23"></path>
+            </svg>
+            <span>Sam</span>
+          </div>
+          <div class="inventory">Inventory</div>
+        </div>
+      </section>
+      <section class="choices" aria-label="Choices">
+        <h2>Choices</h2>
+        <div class="choice-list">
+          <button id="career-fair" type="button">
+            <strong>Go to the career fair</strong>
+            <span>1 energy, $8</span>
+          </button>
+          <button id="nap" type="button">
+            <strong>Take a nap</strong>
+            <span>Gain 1 energy</span>
+          </button>
+        </div>
+      </section>
+    </div>
     <script>
       const careerFair = document.querySelector("#career-fair");
       const nap = document.querySelector("#nap");
-      const stats = document.querySelector("#stats");
+      const health = document.querySelector("#health");
+      const happiness = document.querySelector("#happiness");
+      const money = document.querySelector("#money");
+      const energy = document.querySelector("#energy");
       const status = document.querySelector("#status");
       const reply = document.querySelector("#reply");
       const playground = document.querySelector("#playground");
 
       let world;
 
+      function canChooseFair(state) {
+        return state.sam.energy >= 1 && state.sam.money >= 8;
+      }
+
       function showStats(state) {
         world = state;
-        stats.textContent = `Sam happiness ${state.sam.happiness}, money $${state.sam.money}, energy ${state.sam.energy}/${state.sam.energyMax}. Captain happiness ${state.person1.happiness}, money $${state.person1.money}. Spark happiness ${state.person2.happiness}, money $${state.person2.money}.`;
-        careerFair.disabled = state.sam.energy < 1 || state.sam.money < 8;
+        health.textContent = String(state.sam.health);
+        happiness.textContent = String(state.sam.happiness);
+        money.textContent = `$${state.sam.money}`;
+        energy.textContent = `${state.sam.energy}/${state.sam.energyMax}`;
+        careerFair.disabled = !canChooseFair(state);
       }
 
       async function choose(eventId) {
@@ -107,7 +278,7 @@
           status.textContent = "The page could not reach its own server.";
         } finally {
           nap.disabled = false;
-          careerFair.disabled = world !== undefined && (world.sam.energy < 1 || world.sam.money < 8);
+          if (world !== undefined) careerFair.disabled = !canChooseFair(world);
         }
       }
 
