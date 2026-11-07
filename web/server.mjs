@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { formatMemories, listMemories, saveChoice, saveReply } from "../db/memory.mjs";
-import { EVENTS, applyEvent, formatStats, loadState, saveState } from "./world.mjs";
+import { EVENTS, advanceHour, applyEvent, formatStats, loadState, saveState } from "./world.mjs";
 
 const port = Number(process.env.PORT ?? 4000);
 const agentUrl =
@@ -29,6 +29,13 @@ const server = createServer(async (req, res) => {
   if (req.method === "GET" && url.pathname === "/state") {
     const state = await loadState();
     sendJson(res, 200, { state, events: EVENTS });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/hours") {
+    const state = advanceHour(await loadState());
+    await saveState(state);
+    sendJson(res, 200, { state });
     return;
   }
 

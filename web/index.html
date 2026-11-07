@@ -149,7 +149,16 @@
       .stat { display: flex; justify-content: space-between; gap: 1rem; }
       .stat dt, .stat dd { margin: 0; font-size: 1.05rem; }
       .stat dd { font-variant-numeric: tabular-nums; }
+      .clock {
+        position: absolute;
+        z-index: 1;
+        top: 0.7rem;
+        right: 0.85rem;
+        margin: 0;
+        font-size: 1.35rem;
+      }
       .health { color: var(--health); }
+      .hunger { color: #b86e12; }
       .happiness { color: var(--happiness); }
       .money { color: var(--money); }
       .energy { color: var(--energy); }
@@ -223,7 +232,8 @@
   </head>
   <body>
     <section class="game" aria-label="Game">
-      <p class="scene">Saturday afternoon. Arrow keys or WASD move Sam.</p>
+      <p class="scene">Saturday morning. Arrow keys or WASD move Sam.</p>
+      <p class="clock" id="clock">7:00 AM</p>
       <div class="sandbox" id="sandbox">
         <div class="actor player-token" id="sam">
           <span class="dot"></span>
@@ -250,6 +260,7 @@
         <h2>Player</h2>
         <dl class="stats">
           <div class="stat health"><dt>Health</dt><dd id="health">80</dd></div>
+          <div class="stat hunger"><dt>Hunger</dt><dd id="hunger">20</dd></div>
           <div class="stat happiness"><dt>Happiness</dt><dd id="happiness">50</dd></div>
           <div class="stat money"><dt>Money</dt><dd id="money">$40</dd></div>
           <div class="stat energy"><dt>Energy</dt><dd id="energy">3/3</dd></div>
@@ -294,7 +305,9 @@
       const careerFair = document.querySelector("#career-fair");
       const nap = document.querySelector("#nap");
       const health = document.querySelector("#health");
+      const hunger = document.querySelector("#hunger");
       const happiness = document.querySelector("#happiness");
+      const clock = document.querySelector("#clock");
       const money = document.querySelector("#money");
       const energy = document.querySelector("#energy");
       const status = document.querySelector("#status");
@@ -303,6 +316,12 @@
 
       let world;
 
+      function showClock(hour) {
+        const suffix = hour >= 12 ? "PM" : "AM";
+        const shown = hour % 12 === 0 ? 12 : hour % 12;
+        clock.textContent = `${shown}:00 ${suffix}`;
+      }
+
       function canChooseFair(state) {
         return state.sam.energy >= 1 && state.sam.money >= 8;
       }
@@ -310,7 +329,9 @@
       function showStats(state) {
         world = state;
         health.textContent = String(state.sam.health);
+        hunger.textContent = String(state.sam.hunger);
         happiness.textContent = String(state.sam.happiness);
+        showClock(state.time.hour);
         money.textContent = `$${state.sam.money}`;
         energy.textContent = `${state.sam.energy}/${state.sam.energyMax}`;
         careerFair.disabled = !canChooseFair(state);
@@ -501,6 +522,25 @@
         resident.el.style.top = `${resident.y}px`;
       }
 
+      let clockSeconds = 0;
+      let hourPending = false;
+
+      function stepClock(dt) {
+        if (hourPending) return;
+        clockSeconds += dt;
+        if (clockSeconds < 10) return;
+        clockSeconds = 0;
+        hourPending = true;
+        fetch("/hours", { method: "POST" })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.state) showStats(result.state);
+          })
+          .finally(() => {
+            hourPending = false;
+          });
+      }
+
       placeResidents();
       let last = performance.now();
       function tick(now) {
@@ -511,6 +551,7 @@
         if (encounterId === null) {
           stepPlayer(dt, width, height);
           for (const resident of residents) stepResident(resident, dt, width, height);
+          stepClock(dt);
           checkProximity();
         }
         requestAnimationFrame(tick);

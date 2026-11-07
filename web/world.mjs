@@ -69,10 +69,26 @@ export const EVENTS = {
 
 function startingState() {
   return {
-    sam: { name: "Sam", health: 80, happiness: 50, money: 40, energy: 3, energyMax: 3 },
-    person1: { name: "Captain", health: 90, happiness: 50, money: 80 },
-    person2: { name: "Spark", health: 75, happiness: 50, money: 15 },
+    time: { hour: 7 },
+    sam: { name: "Sam", health: 80, hunger: 20, happiness: 50, money: 40, energy: 3, energyMax: 3 },
+    person1: { name: "Captain", health: 90, hunger: 10, happiness: 50, money: 80 },
+    person2: { name: "Spark", health: 75, hunger: 35, happiness: 50, money: 15 },
   };
+}
+
+export function formatClock(hour) {
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const shown = hour % 12 === 0 ? 12 : hour % 12;
+  return `${shown}:00 ${suffix}`;
+}
+
+export function advanceHour(state) {
+  const next = structuredClone(state);
+  next.time.hour = (next.time.hour + 1) % 24;
+  for (const id of ["sam", "person1", "person2"]) {
+    next[id].hunger = Math.min(100, next[id].hunger + 5);
+  }
+  return next;
 }
 
 function clampHundred(value) {
@@ -126,8 +142,9 @@ export function applyEvent(state, eventId) {
 
 export function formatStats(state) {
   return [
-    `Sam health ${state.sam.health}, happiness ${state.sam.happiness}, money $${state.sam.money}, energy ${state.sam.energy}/${state.sam.energyMax}.`,
-    `Captain health ${state.person1.health}, happiness ${state.person1.happiness}, money $${state.person1.money}.`,
-    `Spark health ${state.person2.health}, happiness ${state.person2.happiness}, money $${state.person2.money}.`,
+    `Time ${formatClock(state.time.hour)}.`,
+    `Sam health ${state.sam.health}, hunger ${state.sam.hunger}, happiness ${state.sam.happiness}, money $${state.sam.money}, energy ${state.sam.energy}/${state.sam.energyMax}.`,
+    `Captain health ${state.person1.health}, hunger ${state.person1.hunger}, happiness ${state.person1.happiness}, money $${state.person1.money}.`,
+    `Spark health ${state.person2.health}, hunger ${state.person2.hunger}, happiness ${state.person2.happiness}, money $${state.person2.money}.`,
   ].join(" ");
 }
