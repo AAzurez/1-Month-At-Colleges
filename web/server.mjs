@@ -38,8 +38,27 @@ const server = createServer(async (req, res) => {
         body: JSON.stringify(payload),
       });
       const agentBody = await agent.text();
+      let reply = "";
+      let playground = "http://127.0.0.1:3000/person1/playground";
+      let agentError = null;
+      if (agentBody !== "") {
+        try {
+          const parsed = JSON.parse(agentBody);
+          reply = typeof parsed.reply === "string" ? parsed.reply : "";
+          if (typeof parsed.playground === "string") playground = parsed.playground;
+          if (typeof parsed.error === "string") agentError = parsed.error;
+        } catch {
+          reply = "";
+        }
+      }
       res.writeHead(agent.ok ? 200 : 502, { "content-type": "application/json" });
-      res.end(JSON.stringify({ ok: agent.ok, agentStatus: agent.status, agentBody }));
+      res.end(JSON.stringify({
+        ok: agent.ok && agentError === null,
+        agentStatus: agent.status,
+        reply,
+        playground,
+        error: agentError,
+      }));
     } catch {
       res.writeHead(502, { "content-type": "application/json" });
       res.end(
