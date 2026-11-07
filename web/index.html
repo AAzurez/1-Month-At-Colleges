@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Career fair choice</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Georgia, "Times New Roman", serif;
+        background: #f4efe6;
+        color: #1c1915;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        width: min(28rem, calc(100% - 2rem));
+        background: #fffdf8;
+        border: 1px solid #ded4c4;
+        border-radius: 12px;
+        padding: 1.5rem;
+      }
+      h1 {
+        margin: 0 0 0.5rem;
+        font-size: 1.6rem;
+      }
+      p {
+        margin: 0 0 1rem;
+        line-height: 1.45;
+      }
+      button {
+        font: inherit;
+        font-size: 1rem;
+        background: #1c1915;
+        color: #fffdf8;
+        border: 0;
+        border-radius: 8px;
+        padding: 0.7rem 1rem;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: wait;
+      }
+      #status {
+        min-height: 1.4rem;
+        margin: 1rem 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Saturday afternoon</h1>
+      <p>Sam can go to the career fair. That choice misses the chemistry lab and means meeting a recruiter.</p>
+      <button id="career-fair" type="button">Go to the career fair</button>
+      <p id="status" role="status"></p>
+    </main>
+    <script>
+      const button = document.querySelector("#career-fair");
+      const status = document.querySelector("#status");
+
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        status.textContent = "Sending the choice…";
+        try {
+          const response = await fetch("/choices", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              playerId: "sam",
+              eventId: "career_fair",
+              summary: "Missed chemistry lab. Met a recruiter.",
+            }),
+          });
+          const result = await response.json();
+          if (result.ok) {
+            status.textContent = "Person 1 accepted the choice. The reply is in the agent terminal.";
+          } else {
+            status.textContent = result.error ?? `The agent returned ${result.agentStatus}.`;
+          }
+        } catch {
+          status.textContent = "The page could not reach its own server.";
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
