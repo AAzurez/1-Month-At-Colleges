@@ -55,21 +55,25 @@
         font-size: 0.95rem;
       }
       .sandbox { position: absolute; inset: 0; }
-      .sandbox.is-paused { background: rgba(28, 25, 21, 0.05); }
-      .pause {
-        position: absolute;
-        z-index: 2;
-        left: 50%;
-        bottom: 0.75rem;
-        transform: translateX(-50%);
-        margin: 0;
-        padding: 0.3rem 0.75rem;
-        border: 2px solid var(--ink);
-        border-radius: 999px;
-        background: #fff;
-        font-size: 0.95rem;
+      .popup {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: rgba(28, 25, 21, 0.35);
       }
-      .encounter-copy { margin: 0 0 0.7rem; line-height: 1.4; }
+      .popup[hidden] { display: none; }
+      .popup-card {
+        width: min(28rem, 100%);
+        background: var(--paper);
+        border: 2px solid var(--ink);
+        border-radius: 12px;
+        padding: 1.1rem 1.15rem 1.15rem;
+      }
+      .popup-card h2 { margin: 0 0 0.45rem; font-size: 1.35rem; font-weight: 500; }
+      .popup-card p { margin: 0 0 0.9rem; line-height: 1.45; }
       .actor {
         position: absolute;
         display: flex;
@@ -220,7 +224,6 @@
   <body>
     <section class="game" aria-label="Game">
       <p class="scene">Saturday afternoon. Arrow keys or WASD move Sam.</p>
-      <p class="pause" id="pause" hidden>Paused</p>
       <div class="sandbox" id="sandbox">
         <div class="actor player-token" id="sam">
           <span class="dot"></span>
@@ -274,12 +277,18 @@
             <span>Gain 1 energy</span>
           </button>
         </div>
-        <div class="choice-list" id="encounter-choices" hidden>
-          <p class="encounter-copy" id="encounter-copy"></p>
-          <button id="encounter-a" type="button"><strong></strong><span></span></button>
-          <button id="encounter-b" type="button"><strong></strong><span></span></button>
-        </div>
       </section>
+    </div>
+    <div class="popup" id="popup" hidden>
+      <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title">
+        <h2 id="popup-title">Paused</h2>
+        <p id="popup-spiel"></p>
+        <div class="choice-list">
+          <button id="popup-talk" type="button"><strong>Talk to them</strong><span>Stay and hear the rest</span></button>
+          <button id="popup-busy" type="button"><strong>Kindly tell them you are busy</strong><span>They head off</span></button>
+          <button id="popup-ignore" type="button"><strong>Ignore</strong><span>Keep walking</span></button>
+        </div>
+      </div>
     </div>
     <script>
       const careerFair = document.querySelector("#career-fair");
@@ -311,8 +320,9 @@
         const fromEncounter = encounterId !== null;
         careerFair.disabled = true;
         nap.disabled = true;
-        encounterA.disabled = true;
-        encounterB.disabled = true;
+        popupTalk.disabled = true;
+        popupBusy.disabled = true;
+        popupIgnore.disabled = true;
         status.textContent = "Sending the choice… person 1 is answering.";
         reply.textContent = "";
         try {
@@ -335,10 +345,11 @@
         } catch {
           status.textContent = "The page could not reach its own server.";
         } finally {
-          if (fromEncounter) endEncounter();
+          if (fromEncounter) finishMeeting(true);
           nap.disabled = false;
-          encounterA.disabled = false;
-          encounterB.disabled = false;
+          popupTalk.disabled = false;
+          popupBusy.disabled = false;
+          popupIgnore.disabled = false;
           if (world !== undefined) careerFair.disabled = !canChooseFair(world);
         }
       }
@@ -349,12 +360,12 @@
       const REACH = 72;
       const RELEASE = 112;
       const sandbox = document.querySelector("#sandbox");
-      const pause = document.querySelector("#pause");
-      const roamChoices = document.querySelector("#roam-choices");
-      const encounterChoices = document.querySelector("#encounter-choices");
-      const encounterCopy = document.querySelector("#encounter-copy");
-      const encounterA = document.querySelector("#encounter-a");
-      const encounterB = document.querySelector("#encounter-b");
+      const popup = document.querySelector("#popup");
+      const popupTitle = document.querySelector("#popup-title");
+      const popupSpiel = document.querySelector("#popup-spiel");
+      const popupTalk = document.querySelector("#popup-talk");
+      const popupBusy = document.querySelector("#popup-busy");
+      const popupIgnore = document.querySelector("#popup-ignore");
       const player = { el: document.querySelector("#sam"), x: 0, y: 0, speed: 140 };
       const residents = [
         { id: "captain", name: "Captain", el: document.querySelector("#captain"), angle: 0.4, speed: 26, pause: 0 },
@@ -362,50 +373,46 @@
       ];
       const meetings = {
         captain: {
-          copy: "Captain stops you. The missed lab is still on their mind.",
-          primary: { id: "captain_listen", title: "Listen", detail: "Hear them out" },
-          secondary: { id: "captain_pass", title: "Keep walking", detail: "Leave the conversation" },
+          title: "Captain",
+          spiel: "Captain flags you down. Their morning was a stack of lab schedules, and they are still sore that the chemistry section went uncovered.",
+          talk: "captain_talk",
+          busy: "captain_busy",
         },
         spark: {
-          copy: "Spark catches you and wants to talk.",
-          primary: { id: "spark_talk", title: "Talk", detail: "Stay for a minute" },
-          secondary: { id: "spark_later", title: "Not now", detail: "Leave the conversation" },
+          title: "Spark",
+          spiel: "Spark catches your sleeve. They spent the afternoon pitching a last-minute club night, and they want to tell you how it went.",
+          talk: "spark_talk",
+          busy: "spark_busy",
         },
       };
       let encounterId = null;
       const cooled = new Set();
 
-      function labelChoice(button, choice) {
-        button.querySelector("strong").textContent = choice.title;
-        button.querySelector("span").textContent = choice.detail;
-      }
-
       function startEncounter(id) {
         const meeting = meetings[id];
         encounterId = id;
         held.clear();
-        sandbox.classList.add("is-paused");
-        pause.hidden = false;
-        pause.textContent = "Paused";
-        roamChoices.hidden = true;
-        encounterChoices.hidden = false;
-        encounterCopy.textContent = meeting.copy;
-        labelChoice(encounterA, meeting.primary);
-        labelChoice(encounterB, meeting.secondary);
+        popupTitle.textContent = meeting.title;
+        popupSpiel.textContent = meeting.spiel;
+        popup.hidden = false;
       }
 
-      function endEncounter() {
-        if (encounterId !== null) cooled.add(encounterId);
+      function finishMeeting(leaves) {
+        const resident = residents.find((item) => item.id === encounterId);
+        if (leaves && resident !== undefined) {
+          resident.gone = true;
+          resident.el.hidden = true;
+        } else if (resident !== undefined) {
+          cooled.add(resident.id);
+        }
         encounterId = null;
-        sandbox.classList.remove("is-paused");
-        pause.hidden = true;
-        roamChoices.hidden = false;
-        encounterChoices.hidden = true;
+        popup.hidden = true;
       }
 
       function checkProximity() {
         let closest = null;
         for (const resident of residents) {
+          if (resident.gone) continue;
           const dist = Math.hypot(player.x - resident.x, player.y - resident.y);
           if (dist > RELEASE) cooled.delete(resident.id);
           if (dist <= REACH && !cooled.has(resident.id) && (closest === null || dist < closest.dist)) {
@@ -415,13 +422,17 @@
         if (closest !== null) startEncounter(closest.id);
       }
 
-      encounterA.addEventListener("click", () => {
+      popupTalk.addEventListener("click", () => {
         if (encounterId === null) return;
-        choose(meetings[encounterId].primary.id);
+        choose(meetings[encounterId].talk);
       });
-      encounterB.addEventListener("click", () => {
+      popupBusy.addEventListener("click", () => {
         if (encounterId === null) return;
-        choose(meetings[encounterId].secondary.id);
+        choose(meetings[encounterId].busy);
+      });
+      popupIgnore.addEventListener("click", () => {
+        if (encounterId === null) return;
+        finishMeeting(false);
       });
       const held = new Set();
       const keyDir = {
@@ -468,6 +479,7 @@
       }
 
       function stepResident(resident, dt, width, height) {
+        if (resident.gone) return;
         const margin = 36;
         if (resident.pause > 0) {
           resident.pause -= dt;
