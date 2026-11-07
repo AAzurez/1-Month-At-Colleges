@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { formatMemories, listMemories, saveChoice, saveReply } from "../db/memory.mjs";
 
 const port = Number(process.env.PORT ?? 4000);
 const agentUrl =
@@ -31,11 +32,28 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    let choiceId;
+    let memory;
+    try {
+      choiceId = await saveChoice({
+        playerId: payload.playerId,
+        eventId: payload.eventId,
+        summary: payload.summary,
+      });
+      const earlier = (await listMemories(payload.playerId)).filter((item) => item.id !== choiceId);
+      memory = formatMemories(earlier);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not save the decision.";
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: message }));
+      return;
+    }
+
     try {
       const agent = await fetch(agentUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, memory }),
       });
       const agentBody = await agent.text();
       let reply = "";
@@ -51,10 +69,21 @@ const server = createServer(async (req, res) => {
           reply = "";
         }
       }
+      if (reply !== "") {
+        try {
+          await saveReply({ choiceId, agent: "person1", reply });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Could not save the reply.";
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: message, choiceId, reply, playground }));
+          return;
+        }
+      }
       res.writeHead(agent.ok ? 200 : 502, { "content-type": "application/json" });
       res.end(JSON.stringify({
         ok: agent.ok && agentError === null,
         agentStatus: agent.status,
+        choiceId,
         reply,
         playground,
         error: agentError,

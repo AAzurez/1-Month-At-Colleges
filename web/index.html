@@ -85,7 +85,7 @@
           const result = await response.json();
           if (typeof result.playground === "string") playground.href = result.playground;
           if (result.ok && result.reply) {
-            status.textContent = "Person 1 answered.";
+            status.textContent = `Saved decision ${result.choiceId}. Person 1 answered.`;
             reply.textContent = result.reply;
           } else if (result.ok) {
             status.textContent = "Person 1 accepted the choice. Read the reply in the playground.";

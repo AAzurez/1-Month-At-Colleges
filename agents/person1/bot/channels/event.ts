@@ -9,10 +9,12 @@ export default defineChannel({
         playerId: z.string(),
         eventId: z.string(),
         summary: z.string(),
+        memory: z.string().optional(),
       }),
       handler: async (_request, { send, body }) => {
+        const earlier = body.memory ?? "No earlier decisions.";
         const session = await send(
-          `The player chose ${body.eventId}. What changed: ${body.summary}. React in character.`,
+          `The player chose ${body.eventId}. What changed: ${body.summary}.\nEarlier decisions:\n${earlier}\nReact in character and keep the new consequence.`,
           { continuationToken: `player:${body.playerId}` },
         );
         const outcome = await session.waitForCompletion();
