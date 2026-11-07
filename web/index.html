@@ -71,7 +71,6 @@
         border: 2px solid var(--ink);
       }
       .actor .name { font-size: 0.75rem; }
-      .player-token { left: 50%; top: 50%; }
       .player-token .dot {
         width: 18px;
         height: 18px;
@@ -205,9 +204,9 @@
   </head>
   <body>
     <section class="game" aria-label="Game">
-      <p class="scene">Saturday afternoon. The career fair is across campus.</p>
+      <p class="scene">Saturday afternoon. Arrow keys or WASD move Sam.</p>
       <div class="sandbox" id="sandbox">
-        <div class="actor player-token">
+        <div class="actor player-token" id="sam">
           <span class="dot"></span>
           <span class="name">Sam</span>
         </div>
@@ -321,18 +320,53 @@
       nap.addEventListener("click", () => choose("nap"));
 
       const sandbox = document.querySelector("#sandbox");
+      const player = { el: document.querySelector("#sam"), x: 0, y: 0, speed: 140 };
       const residents = [
         { el: document.querySelector("#captain"), angle: 0.4, speed: 26, pause: 0 },
         { el: document.querySelector("#spark"), angle: 2.2, speed: 34, pause: 0.4 },
       ];
+      const held = new Set();
+      const keyDir = {
+        arrowup: [0, -1],
+        w: [0, -1],
+        arrowdown: [0, 1],
+        s: [0, 1],
+        arrowleft: [-1, 0],
+        a: [-1, 0],
+        arrowright: [1, 0],
+        d: [1, 0],
+      };
 
       function placeResidents() {
         const width = sandbox.clientWidth;
         const height = sandbox.clientHeight;
+        player.x = width * 0.5;
+        player.y = height * 0.5;
         residents[0].x = width * 0.32;
         residents[0].y = height * 0.62;
         residents[1].x = width * 0.7;
         residents[1].y = height * 0.38;
+      }
+
+      function stepPlayer(dt, width, height) {
+        let dx = 0;
+        let dy = 0;
+        for (const name of held) {
+          const dir = keyDir[name];
+          if (dir === undefined) continue;
+          dx += dir[0];
+          dy += dir[1];
+        }
+        if (dx !== 0 || dy !== 0) {
+          const length = Math.hypot(dx, dy);
+          player.x += (dx / length) * player.speed * dt;
+          player.y += (dy / length) * player.speed * dt;
+        }
+        const margin = 36;
+        player.x = Math.max(margin, Math.min(width - margin, player.x));
+        player.y = Math.max(margin, Math.min(height - margin, player.y));
+        player.el.style.left = `${player.x}px`;
+        player.el.style.top = `${player.y}px`;
       }
 
       function stepResident(resident, dt, width, height) {
@@ -364,6 +398,7 @@
         last = now;
         const width = sandbox.clientWidth;
         const height = sandbox.clientHeight;
+        stepPlayer(dt, width, height);
         for (const resident of residents) stepResident(resident, dt, width, height);
         requestAnimationFrame(tick);
       }
@@ -371,11 +406,23 @@
       window.addEventListener("resize", () => {
         const width = sandbox.clientWidth;
         const height = sandbox.clientHeight;
+        player.x = Math.max(36, Math.min(width - 36, player.x));
+        player.y = Math.max(36, Math.min(height - 36, player.y));
         for (const resident of residents) {
           resident.x = Math.max(36, Math.min(width - 36, resident.x));
           resident.y = Math.max(36, Math.min(height - 36, resident.y));
         }
       });
+      window.addEventListener("keydown", (event) => {
+        const name = event.key.toLowerCase();
+        if (keyDir[name] === undefined) return;
+        held.add(name);
+        event.preventDefault();
+      });
+      window.addEventListener("keyup", (event) => {
+        held.delete(event.key.toLowerCase());
+      });
+      window.addEventListener("blur", () => held.clear());
       fetch("/state")
         .then((response) => response.json())
         .then((result) => showStats(result.state));
