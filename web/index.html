@@ -41,6 +41,7 @@
         border-radius: 8px;
         padding: 0.7rem 1rem;
         cursor: pointer;
+        margin: 0 0.4rem 0 0;
       }
       button:disabled {
         opacity: 0.6;
@@ -56,36 +57,46 @@
   <body>
     <main>
       <h1>Saturday afternoon</h1>
-      <p>Sam can go to the career fair. That choice misses the chemistry lab and means meeting a recruiter.</p>
+      <p id="stats"></p>
+      <p>The career fair costs 1 energy and $8. Sam misses chemistry lab and meets a recruiter. A nap gives 1 energy back.</p>
       <button id="career-fair" type="button">Go to the career fair</button>
+      <button id="nap" type="button">Take a nap</button>
       <p id="status" role="status"></p>
       <p id="reply"></p>
       <p><a id="playground" href="http://127.0.0.1:3000/person1/playground">Open person 1's playground</a></p>
     </main>
     <script>
-      const button = document.querySelector("#career-fair");
+      const careerFair = document.querySelector("#career-fair");
+      const nap = document.querySelector("#nap");
+      const stats = document.querySelector("#stats");
       const status = document.querySelector("#status");
       const reply = document.querySelector("#reply");
       const playground = document.querySelector("#playground");
 
-      button.addEventListener("click", async () => {
-        button.disabled = true;
+      let world;
+
+      function showStats(state) {
+        world = state;
+        stats.textContent = `Sam happiness ${state.sam.happiness}, money $${state.sam.money}, energy ${state.sam.energy}/${state.sam.energyMax}. Captain happiness ${state.person1.happiness}, money $${state.person1.money}. Spark happiness ${state.person2.happiness}, money $${state.person2.money}.`;
+        careerFair.disabled = state.sam.energy < 1 || state.sam.money < 8;
+      }
+
+      async function choose(eventId) {
+        careerFair.disabled = true;
+        nap.disabled = true;
         status.textContent = "Sending the choice… person 1 is answering.";
         reply.textContent = "";
         try {
           const response = await fetch("/choices", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              playerId: "sam",
-              eventId: "career_fair",
-              summary: "Missed chemistry lab. Met a recruiter.",
-            }),
+            body: JSON.stringify({ playerId: "sam", eventId }),
           });
           const result = await response.json();
+          if (result.state) showStats(result.state);
           if (typeof result.playground === "string") playground.href = result.playground;
           if (result.ok && result.reply) {
-            status.textContent = `Saved decision ${result.choiceId}. Person 1 answered.`;
+            status.textContent = "Person 1 answered.";
             reply.textContent = result.reply;
           } else if (result.ok) {
             status.textContent = "Person 1 accepted the choice. Read the reply in the playground.";
@@ -95,9 +106,16 @@
         } catch {
           status.textContent = "The page could not reach its own server.";
         } finally {
-          button.disabled = false;
+          nap.disabled = false;
+          careerFair.disabled = world !== undefined && (world.sam.energy < 1 || world.sam.money < 8);
         }
-      });
+      }
+
+      careerFair.addEventListener("click", () => choose("career_fair"));
+      nap.addEventListener("click", () => choose("nap"));
+      fetch("/state")
+        .then((response) => response.json())
+        .then((result) => showStats(result.state));
     </script>
   </body>
 </html>
