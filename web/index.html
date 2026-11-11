@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>College Experience</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1c1915;
+        --paper: #fffdf8;
+        --line: #1c1915;
+        --health: #c23b3b;
+        --happiness: #d4538a;
+        --money: #2f8f4e;
+        --energy: #2f5f8a;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 18rem;
+        grid-template-rows: minmax(0, 1fr) auto;
+        min-height: 100vh;
+      }
+      .game, .chat, .player, .choices {
+        border-color: var(--line);
+        border-style: solid;
+      }
+      .game {
+        grid-column: 1;
+        grid-row: 1;
+        position: relative;
+        overflow: hidden;
+        border-width: 0 0 2px 0;
+        min-height: 18rem;
+        background:
+          linear-gradient(#efe8dc 1px, transparent 1px),
+          linear-gradient(90deg, #efe8dc 1px, transparent 1px),
+          #f7f3ec;
+        background-size: 28px 28px;
+      }
+      .daybar {
+        position: absolute;
+        z-index: 1;
+        top: 0.7rem;
+        left: 0.85rem;
+        right: 0.85rem;
+        pointer-events: none;
+      }
+      .timeline {
+        position: relative;
+        height: 0.9rem;
+        border: 2px solid var(--ink);
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          #141a33 0%,
+          #1f2a52 20%,
+          #e9a07a 27%,
+          #9ccbe8 37%,
+          #d8eefa 50%,
+          #9ccbe8 63%,
+          #e88a6a 76%,
+          #2a2f5c 84%,
+          #141a33 100%
+        );
+      }
+      .now {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 0.95rem;
+        height: 0.95rem;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid var(--ink);
+        transform: translate(-50%, -50%);
+      }
+      .ticks {
+        position: relative;
+        height: 0.9rem;
+        margin-top: 0.2rem;
+        font-size: 0.7rem;
+        color: #6d675f;
+      }
+      .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+      .ticks span:first-child { transform: none; }
+      .ticks span:last-child { transform: translateX(-100%); }
+      .day { margin: 0.15rem 0 0; font-size: 1.35rem; }
+      .scene { margin: 0.1rem 0 0; font-size: 0.85rem; color: #6d675f; }
+      .end-game {
+        position: absolute;
+        z-index: 1;
+        right: 0.85rem;
+        bottom: 0.85rem;
+        padding: 0.45rem 0.8rem;
+        font-size: 0.92rem;
+      }
+      .sandbox { position: absolute; inset: 0; }
+      .popup {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: rgba(28, 25, 21, 0.35);
+      }
+      .popup[hidden] { display: none; }
+      .popup-card {
+        width: min(28rem, 100%);
+        background: var(--paper);
+        border: 2px solid var(--ink);
+        border-radius: 12px;
+        padding: 1.1rem 1.15rem 1.15rem;
+      }
+      .popup-card h2 { margin: 0 0 0.45rem; font-size: 1.35rem; font-weight: 500; }
+      .popup-card p { margin: 0 0 0.9rem; line-height: 1.45; }
+      .actor {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15rem;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+      .actor .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid var(--ink);
+      }
+      .actor .name { font-size: 0.75rem; }
+      .player-token .dot {
+        width: 18px;
+        height: 18px;
+        background: var(--ink);
+        box-shadow: 0 0 0 7px rgba(28, 25, 21, 0.08);
+      }
+      .captain .dot { background: var(--energy); }
+      .spark .dot { background: var(--happiness); }
+      .chat {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        border-width: 0 0 0 2px;
+        padding: 1rem 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .chat h2, .player h2, .choices h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 500;
+      }
+      #status, #reply {
+        margin: 0.8rem 0 0;
+        line-height: 1.45;
+      }
+      #reply { white-space: pre-wrap; }
+      .chat a {
+        margin-top: auto;
+        padding-top: 1rem;
+        color: var(--ink);
+      }
+      .dock {
+        grid-column: 1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: minmax(16rem, 24rem) minmax(0, 1fr);
+        min-height: 15.5rem;
+      }
+      .player {
+        border-width: 0 2px 0 0;
+        padding: 0.85rem 1rem 1rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 8.5rem;
+        grid-template-rows: auto 1fr;
+        column-gap: 0.8rem;
+      }
+      .player > .icon { grid-column: 1; grid-row: 1; align-self: start; }
+      .stats {
+        grid-column: 1;
+        grid-row: 2;
+        margin: 0.7rem 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .stat {
+        display: grid;
+        grid-template-columns: 5.4rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .stat dt, .stat dd { margin: 0; font-size: 1.05rem; }
+      .stat dd {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .bar {
+        flex: 1;
+        height: 0.7rem;
+        border: 1.5px solid currentColor;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .bar .fill {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: currentColor;
+        transition: width 0.3s ease;
+      }
+      .pips { flex: 1; display: flex; gap: 0.2rem; }
+      .pip {
+        flex: 1;
+        height: 0.7rem;
+        border: 1.5px solid currentColor;
+        border-radius: 3px;
+        background: #fff;
+      }
+      .pip.on { background: currentColor; }
+      .num { min-width: 2.6rem; text-align: right; font-size: 0.85rem; }
+      .final-stats { margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+      .final-stats div { display: flex; justify-content: space-between; }
+      .final-stats dt, .final-stats dd { margin: 0; }
+      .health { color: var(--health); }
+      .hunger { color: #b86e12; }
+      .stat.money dd { font-size: 1.05rem; }
+      .happiness { color: var(--happiness); }
+      .money { color: var(--money); }
+      .energy { color: var(--energy); }
+      .icon, .inventory {
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .icon {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.45rem 0.75rem;
+      }
+      .icon svg { flex: none; }
+      .icon span { font-size: 1.2rem; }
+      .inventory {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        min-height: 6.5rem;
+        display: grid;
+        place-items: center;
+        color: #6d675f;
+        font-size: 0.95rem;
+      }
+      .choices {
+        border-width: 0;
+        padding: 0.85rem 1.1rem 1.1rem;
+        display: flex;
+        flex-direction: column;
+      }
+      .choices h2 { margin-bottom: 0.8rem; }
+      .choice-list { display: flex; flex-direction: column; gap: 0.65rem; }
+      button {
+        font: inherit;
+        text-align: left;
+        background: #fff;
+        color: var(--ink);
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        padding: 0.7rem 0.85rem;
+        cursor: pointer;
+      }
+      button strong { display: block; font-weight: 500; font-size: 1.05rem; }
+      button span { display: block; margin-top: 0.15rem; color: #5c564e; font-size: 0.92rem; }
+      button:hover:not(:disabled) { background: #f6f1e8; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      @media (max-width: 800px) {
+        body {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto auto;
+          height: auto;
+        }
+        .game { min-height: 18rem; }
+        .chat {
+          grid-column: 1;
+          grid-row: 3;
+          border-width: 2px 0 0 0;
+          min-height: 14rem;
+        }
+        .dock { grid-template-columns: 1fr; }
+        .player { border-width: 0 0 2px 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="game" aria-label="Game">
+      <div class="daybar">
+        <div class="timeline" id="clock" role="meter" aria-label="Time of day" aria-valuemin="0" aria-valuemax="24" aria-valuenow="7" aria-valuetext="7:00 AM">
+          <span class="now" id="now"></span>
+        </div>
+        <div class="ticks" aria-hidden="true">
+          <span style="left: 0%">12 AM</span>
+          <span style="left: 25%">6 AM</span>
+          <span style="left: 50%">12 PM</span>
+          <span style="left: 75%">6 PM</span>
+          <span style="left: 100%">12 AM</span>
+        </div>
+        <p class="day" id="day">Monday</p>
+        <p class="scene">Arrow keys or WASD move Sam.</p>
+      </div>
+      <button class="end-game" id="end-game" type="button">End game early</button>
+      <div class="sandbox" id="sandbox">
+        <div class="actor player-token" id="sam">
+          <span class="dot"></span>
+          <span class="name">Sam</span>
+        </div>
+        <div class="actor captain" id="captain">
+          <span class="dot"></span>
+          <span class="name">Captain</span>
+        </div>
+        <div class="actor spark" id="spark">
+          <span class="dot"></span>
+          <span class="name">Spark</span>
+        </div>
+      </div>
+    </section>
+    <aside class="chat" aria-label="Chat">
+      <h2>Chat</h2>
+      <p id="status" role="status">Captain will answer here.</p>
+      <p id="reply"></p>
+      <a id="playground" href="http://127.0.0.1:3000/person1/playground">Open person 1's playground</a>
+    </aside>
+    <div class="dock">
+      <section class="player" aria-label="Player">
+        <h2 class="icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#1c1915" stroke-width="1.6" aria-hidden="true">
+            <circle cx="14" cy="8" r="3.2"></circle>
+            <path d="M7 23c.8-4.2 3.2-6.2 7-6.2S20.2 18.8 21 23"></path>
+          </svg>
+          <span id="player-name">Sam</span>
+        </h2>
+        <dl class="stats">
+          <div class="stat health"><dt>Health</dt><dd id="health"><span class="bar" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat hunger"><dt>Hunger</dt><dd id="hunger"><span class="bar" role="meter" aria-label="Hunger" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat happiness"><dt>Happiness</dt><dd id="happiness"><span class="bar" role="meter" aria-label="Happiness" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat money"><dt>Money</dt><dd id="money">$40</dd></div>
+          <div class="stat energy"><dt>Energy</dt><dd id="energy"><span class="pips" role="meter" aria-label="Energy" aria-valuemin="0"></span><span class="num"></span></dd></div>
+        </dl>
+        <div class="inventory">Inventory</div>
+      </section>
+      <section class="choices" aria-label="Choices">
+        <h2>Choices</h2>
+        <div class="choice-list" id="roam-choices">
+          <button id="career-fair" type="button">
+            <strong>Go to the career fair</strong>
+            <span>1 energy, $8</span>
+          </button>
+          <button id="nap" type="button">
+            <strong>Take a nap</strong>
+            <span>Gain 1 energy</span>
+          </button>
+        </div>
+      </section>
+    </div>
+    <div class="popup" id="popup" hidden>
+      <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title">
+        <h2 id="popup-title">Paused</h2>
+        <p id="popup-spiel"></p>
+        <div class="choice-list">
+          <button id="popup-talk" type="button"><strong>Talk to them</strong><span>Stay and hear the rest</span></button>
+          <button id="popup-busy" type="button"><strong>Kindly tell them you are busy</strong><span>They head off</span></button>
+          <button id="popup-ignore" type="button"><strong>Ignore</strong><span>Keep walking</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="popup" id="end-popup" hidden>
+      <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="end-title">
+        <div id="end-confirm">
+          <h2 id="end-title">End the game early?</h2>
+          <p>The day stops here and you see how Sam did.</p>
+          <div class="choice-list">
+            <button id="end-yes" type="button"><strong>End game</strong><span>See the final stats</span></button>
+            <button id="end-no" type="button"><strong>Keep playing</strong><span>Back to the day</span></button>
+          </div>
+        </div>
+        <div id="end-summary" hidden>
+          <h2>Game over</h2>
+          <p id="end-when"></p>
+          <dl class="final-stats" id="final-stats"></dl>
+          <div class="choice-list">
+            <button id="new-game" type="button"><strong>Start a new game</strong><span>Back to Monday morning</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const careerFair = document.querySelector("#career-fair");
+      const nap = document.querySelector("#nap");
+      const health = document.querySelector("#health");
+      const hunger = document.querySelector("#hunger");
+      const happiness = document.querySelector("#happiness");
+      const clock = document.querySelector("#clock");
+      const money = document.querySelector("#money");
+      const energy = document.querySelector("#energy");
+      const status = document.querySelector("#status");
+      const reply = document.querySelector("#reply");
+      const playground = document.querySelector("#playground");
+
+      let world;
+
+      const now = document.querySelector("#now");
+      const dayLabel = document.querySelector("#day");
+      const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+      function clockText(hour) {
+        const suffix = hour >= 12 ? "PM" : "AM";
+        const shown = hour % 12 === 0 ? 12 : hour % 12;
+        return `${shown}:00 ${suffix}`;
+      }
+
+      function showClock(hour, day) {
+        clock.setAttribute("aria-valuenow", String(hour));
+        clock.setAttribute("aria-valuetext", clockText(hour));
+        dayLabel.textContent = DAYS[(day ?? 0) % 7];
+      }
+
+      function moveNow() {
+        if (world === undefined) return;
+        const fraction = Math.min(1, clockSeconds / 10);
+        now.style.left = `${((world.time.hour + fraction) / 24) * 100}%`;
+      }
+
+      function canChooseFair(state) {
+        return state.sam.energy >= 1 && state.sam.money >= 8;
+      }
+
+      function showBar(el, value) {
+        const shown = Math.max(0, Math.min(100, value));
+        el.querySelector(".fill").style.width = `${shown}%`;
+        el.querySelector(".bar").setAttribute("aria-valuenow", String(shown));
+        el.querySelector(".num").textContent = `${shown}/100`;
+      }
+
+      function showEnergy(value, max) {
+        const pips = energy.querySelector(".pips");
+        if (pips.children.length !== max) {
+          pips.replaceChildren(
+            ...Array.from({ length: max }, () => {
+              const pip = document.createElement("span");
+              pip.className = "pip";
+              return pip;
+            }),
+          );
+        }
+        [...pips.children].forEach((pip, i) => pip.classList.toggle("on", i < value));
+        pips.setAttribute("aria-valuemax", String(max));
+        pips.setAttribute("aria-valuenow", String(value));
+        energy.querySelector(".num").textContent = `${value}/${max}`;
+      }
+
+      function showStats(state) {
+        world = state;
+        document.querySelector("#player-name").textContent = state.sam.fullName ?? state.sam.name;
+        showBar(health, state.sam.health);
+        showBar(hunger, state.sam.hunger);
+        showBar(happiness, state.sam.happiness);
+        showClock(state.time.hour, state.time.day);
+        passHours(state.time.hour);
+        money.textContent = `$${state.sam.money}`;
+        showEnergy(state.sam.energy, state.sam.energyMax);
+        careerFair.disabled = !canChooseFair(state);
+      }
+
+      async function choose(eventId) {
+        const fromEncounter = encounterId !== null;
+        careerFair.disabled = true;
+        nap.disabled = true;
+        popupTalk.disabled = true;
+        popupBusy.disabled = true;
+        popupIgnore.disabled = true;
+        status.textContent = "Sending the choice… person 1 is answering.";
+        reply.textContent = "";
+        try {
+          const response = await fetch("/choices", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ playerId: "sam", eventId }),
+          });
+          const result = await response.json();
+          if (result.state) showStats(result.state);
+          if (typeof result.playground === "string") playground.href = result.playground;
+          if (result.ok && result.reply) {
+            status.textContent = "Person 1 answered.";
+            reply.textContent = result.reply;
+          } else if (result.ok) {
+            status.textContent = "Person 1 accepted the choice. Read the reply in the playground.";
+          } else {
+            status.textContent = result.error ?? `The agent returned ${result.agentStatus}.`;
+          }
+        } catch {
+          status.textContent = "The page could not reach its own server.";
+        } finally {
+          if (fromEncounter) finishMeeting(true);
+          nap.disabled = false;
+          popupTalk.disabled = false;
+          popupBusy.disabled = false;
+          popupIgnore.disabled = false;
+          if (world !== undefined) careerFair.disabled = !canChooseFair(world);
+        }
+      }
+
+      careerFair.addEventListener("click", () => choose("career_fair"));
+      nap.addEventListener("click", () => choose("nap"));
+
+      const REACH = 72;
+      const RELEASE = 112;
+      const sandbox = document.querySelector("#sandbox");
+      const popup = document.querySelector("#popup");
+      const popupTitle = document.querySelector("#popup-title");
+      const popupSpiel = document.querySelector("#popup-spiel");
+      const popupTalk = document.querySelector("#popup-talk");
+      const popupBusy = document.querySelector("#popup-busy");
+      const popupIgnore = document.querySelector("#popup-ignore");
+      const player = { el: document.querySelector("#sam"), x: 0, y: 0, speed: 140 };
+      const residents = [
+        { id: "captain", name: "Captain", el: document.querySelector("#captain"), angle: 0.4, speed: 26, pause: 0 },
+        { id: "spark", name: "Spark", el: document.querySelector("#spark"), angle: 2.2, speed: 34, pause: 0.4 },
+      ];
+      const meetings = {
+        captain: {
+          title: "Captain",
+          spiel: "Captain flags you down. Their morning was a stack of lab schedules, and they are still sore that the chemistry section went uncovered.",
+          talk: "captain_talk",
+          busy: "captain_busy",
+        },
+        spark: {
+          title: "Spark",
+          spiel: "Spark catches your sleeve. They spent the afternoon pitching a last-minute club night, and they want to tell you how it went.",
+          talk: "spark_talk",
+          busy: "spark_busy",
+        },
+      };
+      let encounterId = null;
+      const cooled = new Set();
+      const AWAY_HOURS = 3;
+      let lastHour = null;
+
+      function returnResident(resident) {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        const margin = 36;
+        let x;
+        let y;
+        do {
+          x = margin + Math.random() * (width - margin * 2);
+          y = margin + Math.random() * (height - margin * 2);
+        } while (Math.hypot(x - player.x, y - player.y) < RELEASE && width > RELEASE * 2);
+        resident.x = x;
+        resident.y = y;
+        resident.angle = Math.random() * Math.PI * 2;
+        resident.pause = 0;
+        resident.gone = false;
+        resident.el.hidden = false;
+        cooled.delete(resident.id);
+      }
+
+      function passHours(hour) {
+        if (lastHour !== null && hour !== lastHour) {
+          const passed = (hour - lastHour + 24) % 24;
+          for (const resident of residents) {
+            if (!resident.gone) continue;
+            resident.awayHours -= passed;
+            if (resident.awayHours <= 0) returnResident(resident);
+          }
+        }
+        lastHour = hour;
+      }
+
+      function startEncounter(id) {
+        const meeting = meetings[id];
+        encounterId = id;
+        held.clear();
+        popupTitle.textContent = meeting.title;
+        popupSpiel.textContent = meeting.spiel;
+        popup.hidden = false;
+      }
+
+      function finishMeeting(leaves) {
+        const resident = residents.find((item) => item.id === encounterId);
+        if (leaves && resident !== undefined) {
+          resident.gone = true;
+          resident.awayHours = AWAY_HOURS;
+          resident.el.hidden = true;
+        } else if (resident !== undefined) {
+          cooled.add(resident.id);
+        }
+        encounterId = null;
+        popup.hidden = true;
+      }
+
+      function checkProximity() {
+        let closest = null;
+        for (const resident of residents) {
+          if (resident.gone) continue;
+          const dist = Math.hypot(player.x - resident.x, player.y - resident.y);
+          if (dist > RELEASE) cooled.delete(resident.id);
+          if (dist <= REACH && !cooled.has(resident.id) && (closest === null || dist < closest.dist)) {
+            closest = { id: resident.id, dist };
+          }
+        }
+        if (closest !== null) startEncounter(closest.id);
+      }
+
+      popupTalk.addEventListener("click", () => {
+        if (encounterId === null) return;
+        choose(meetings[encounterId].talk);
+      });
+      popupBusy.addEventListener("click", () => {
+        if (encounterId === null) return;
+        choose(meetings[encounterId].busy);
+      });
+      popupIgnore.addEventListener("click", () => {
+        if (encounterId === null) return;
+        finishMeeting(false);
+      });
+      const held = new Set();
+      const keyDir = {
+        arrowup: [0, -1],
+        w: [0, -1],
+        arrowdown: [0, 1],
+        s: [0, 1],
+        arrowleft: [-1, 0],
+        a: [-1, 0],
+        arrowright: [1, 0],
+        d: [1, 0],
+      };
+
+      function placeResidents() {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        player.x = width * 0.5;
+        player.y = height * 0.5;
+        residents[0].x = width * 0.32;
+        residents[0].y = height * 0.62;
+        residents[1].x = width * 0.7;
+        residents[1].y = height * 0.38;
+      }
+
+      function stepPlayer(dt, width, height) {
+        let dx = 0;
+        let dy = 0;
+        for (const name of held) {
+          const dir = keyDir[name];
+          if (dir === undefined) continue;
+          dx += dir[0];
+          dy += dir[1];
+        }
+        if (dx !== 0 || dy !== 0) {
+          const length = Math.hypot(dx, dy);
+          player.x += (dx / length) * player.speed * dt;
+          player.y += (dy / length) * player.speed * dt;
+        }
+        const margin = 36;
+        player.x = Math.max(margin, Math.min(width - margin, player.x));
+        player.y = Math.max(margin, Math.min(height - margin, player.y));
+        player.el.style.left = `${player.x}px`;
+        player.el.style.top = `${player.y}px`;
+      }
+
+      function stepResident(resident, dt, width, height) {
+        if (resident.gone) return;
+        const margin = 36;
+        if (resident.pause > 0) {
+          resident.pause -= dt;
+        } else {
+          resident.x += Math.cos(resident.angle) * resident.speed * dt;
+          resident.y += Math.sin(resident.angle) * resident.speed * dt;
+          if (Math.random() < dt * 0.45) resident.angle += (Math.random() - 0.5) * 1.2;
+          if (Math.random() < dt * 0.12) resident.pause = 0.4 + Math.random() * 1.2;
+        }
+        if (resident.x < margin || resident.x > width - margin) {
+          resident.angle = Math.PI - resident.angle;
+          resident.x = Math.max(margin, Math.min(width - margin, resident.x));
+        }
+        if (resident.y < margin || resident.y > height - margin) {
+          resident.angle = -resident.angle;
+          resident.y = Math.max(margin, Math.min(height - margin, resident.y));
+        }
+        resident.el.style.left = `${resident.x}px`;
+        resident.el.style.top = `${resident.y}px`;
+      }
+
+      let clockSeconds = 0;
+      let hourPending = false;
+
+      function stepClock(dt) {
+        if (hourPending) return;
+        clockSeconds += dt;
+        if (clockSeconds < 10) return;
+        clockSeconds = 0;
+        hourPending = true;
+        fetch("/hours", { method: "POST" })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.state) showStats(result.state);
+          })
+          .finally(() => {
+            hourPending = false;
+          });
+      }
+
+      placeResidents();
+      let last = performance.now();
+      function tick(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        if (encounterId === null && !paused) {
+          stepPlayer(dt, width, height);
+          for (const resident of residents) stepResident(resident, dt, width, height);
+          stepClock(dt);
+          checkProximity();
+        }
+        moveNow();
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      let paused = false;
+      const endGame = document.querySelector("#end-game");
+      const endPopup = document.querySelector("#end-popup");
+      const endConfirm = document.querySelector("#end-confirm");
+      const endSummary = document.querySelector("#end-summary");
+      const endWhen = document.querySelector("#end-when");
+      const finalStats = document.querySelector("#final-stats");
+
+      endGame.addEventListener("click", () => {
+        if (encounterId !== null) return;
+        paused = true;
+        held.clear();
+        endConfirm.hidden = false;
+        endSummary.hidden = true;
+        endPopup.hidden = false;
+      });
+      document.querySelector("#end-no").addEventListener("click", () => {
+        endPopup.hidden = true;
+        paused = false;
+      });
+      document.querySelector("#end-yes").addEventListener("click", () => {
+        const sam = world.sam;
+        endWhen.textContent = `Sam's run ended on ${DAYS[(world.time.day ?? 0) % 7]} at ${clockText(world.time.hour)}.`;
+        finalStats.replaceChildren(
+          ...[
+            ["Health", `${sam.health}/100`],
+            ["Hunger", `${sam.hunger}/100`],
+            ["Happiness", `${sam.happiness}/100`],
+            ["Money", `$${sam.money}`],
+            ["Energy", `${sam.energy}/${sam.energyMax}`],
+          ].map(([label, value]) => {
+            const row = document.createElement("div");
+            const dt = document.createElement("dt");
+            const dd = document.createElement("dd");
+            dt.textContent = label;
+            dd.textContent = value;
+            row.append(dt, dd);
+            return row;
+          }),
+        );
+        endConfirm.hidden = true;
+        endSummary.hidden = false;
+        endGame.disabled = true;
+      });
+      document.querySelector("#new-game").addEventListener("click", async () => {
+        const result = await fetch("/reset", { method: "POST" }).then((response) => response.json());
+        for (const resident of residents) {
+          resident.gone = false;
+          resident.el.hidden = false;
+        }
+        cooled.clear();
+        placeResidents();
+        lastHour = null;
+        clockSeconds = 0;
+        reply.textContent = "";
+        status.textContent = "Captain will answer here.";
+        if (result.state) showStats(result.state);
+        endGame.disabled = false;
+        endPopup.hidden = true;
+        paused = false;
+      });
+      window.addEventListener("resize", () => {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        player.x = Math.max(36, Math.min(width - 36, player.x));
+        player.y = Math.max(36, Math.min(height - 36, player.y));
+        for (const resident of residents) {
+          resident.x = Math.max(36, Math.min(width - 36, resident.x));
+          resident.y = Math.max(36, Math.min(height - 36, resident.y));
+        }
+      });
+      window.addEventListener("keydown", (event) => {
+        const name = event.key.toLowerCase();
+        if (keyDir[name] === undefined) return;
+        held.add(name);
+        event.preventDefault();
+      });
+      window.addEventListener("keyup", (event) => {
+        held.delete(event.key.toLowerCase());
+      });
+      window.addEventListener("blur", () => held.clear());
+      fetch("/state")
+        .then((response) => response.json())
+        .then((result) => showStats(result.state));
+    </script>
+  </body>
+</html>

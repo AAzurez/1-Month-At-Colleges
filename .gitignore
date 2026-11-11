@@ -1,3 +1,6 @@
+node_modules/
+web/state.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -218,3 +221,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Solana devnet wallets (private keys) and balance mirror
+solana/config.json
+solana/balances.json

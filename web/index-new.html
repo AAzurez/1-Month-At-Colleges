@@ -1,0 +1,2625 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>College Experience</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1c1915;
+        --paper: #fffdf8;
+        --line: #1c1915;
+        --health: #c23b3b;
+        --happiness: #d4538a;
+        --money: #2f8f4e;
+        --energy: #2f5f8a;
+        font-family: Georgia, "Times New Roman", serif;
+      }
+      * { box-sizing: border-box; }
+      html { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 18rem;
+        /* Everything fits in the window: the game on top, the player and choices below,
+           each panel scrolling on its own if it needs to. */
+        grid-template-rows: minmax(0, 56fr) minmax(0, 44fr);
+        height: 100vh;
+        overflow: hidden;
+      }
+      .game, .chat, .player, .choices {
+        border-color: var(--line);
+        border-style: solid;
+      }
+      .game {
+        grid-column: 1;
+        grid-row: 1;
+        position: relative;
+        overflow: hidden;
+        border-width: 0 0 2px 0;
+        min-height: 0;
+        background: #e3ead3;
+      }
+      .daybar {
+        position: absolute;
+        z-index: 1;
+        top: 0.7rem;
+        left: 0.85rem;
+        right: 0.85rem;
+        pointer-events: none;
+      }
+      .timeline {
+        position: relative;
+        height: 0.9rem;
+        border: 2px solid var(--ink);
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          #141a33 0%,
+          #1f2a52 20%,
+          #e9a07a 27%,
+          #9ccbe8 37%,
+          #d8eefa 50%,
+          #9ccbe8 63%,
+          #e88a6a 76%,
+          #2a2f5c 84%,
+          #141a33 100%
+        );
+      }
+      .now {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 0.95rem;
+        height: 0.95rem;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid var(--ink);
+        transform: translate(-50%, -50%);
+      }
+      .ticks {
+        position: relative;
+        height: 0.9rem;
+        margin-top: 0.2rem;
+        font-size: 0.7rem;
+        color: #6d675f;
+      }
+      .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+      .ticks span:first-child { transform: none; }
+      .ticks span:last-child { transform: translateX(-100%); }
+      .day-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-top: 0.15rem; }
+      .day { margin: 0; font-size: 1.35rem; line-height: 1.2; }
+      .weekday { display: block; font-size: 0.95rem; color: #5c564e; }
+      .weather {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.2rem 0.55rem 0.2rem 0.35rem;
+        border: 2px solid var(--ink);
+        border-radius: 999px;
+        background: var(--paper);
+        font-size: 0.85rem;
+        color: #4f4a43;
+      }
+      .weather svg { display: block; flex: none; }
+      .day-drop {
+        position: absolute;
+        z-index: 4;
+        top: 0;
+        left: 50%;
+        min-width: 13rem;
+        padding: 0.7rem 1.4rem 0.8rem;
+        text-align: center;
+        background: var(--ink);
+        color: var(--paper);
+        border-radius: 0 0 14px 14px;
+        transform: translate(-50%, -110%);
+        transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+        pointer-events: none;
+      }
+      .day-drop.show { transform: translate(-50%, 0); }
+      .day-drop strong { display: block; font-size: 1.7rem; font-weight: 500; letter-spacing: 0.02em; }
+      .day-drop span { display: block; margin-top: 0.1rem; font-size: 0.9rem; opacity: 0.8; }
+      @media (prefers-reduced-motion: reduce) { .day-drop { transition: none; } }
+      .choice-group { margin: 0.6rem 0 0.15rem; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #6d675f; grid-column: 1 / -1; }
+      .choice-group:first-child { margin-top: 0; }
+      .game-buttons {
+        position: absolute;
+        z-index: 1;
+        right: 0.85rem;
+        bottom: 0.85rem;
+        display: flex;
+        gap: 0.5rem;
+      }
+      .game-buttons button { padding: 0.45rem 0.8rem; font-size: 0.92rem; }
+      .pause-overlay {
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: rgba(28, 25, 21, 0.35);
+      }
+      .pause-overlay[hidden] { display: none; }
+      .pause-overlay .popup-card { width: min(20rem, 100%); text-align: center; }
+      .pause-overlay button { text-align: center; width: 100%; }
+      .pause-overlay .key { color: #6d675f; font-size: 0.85rem; margin: 0.6rem 0 0; }
+      .sandbox { position: absolute; inset: 0; }
+      .burnout { color: #a0522d; }
+      .stat.burnout.high dd .bar { animation: warn 1.4s ease-in-out infinite; }
+      .stat.burnout.strained dt::after { content: " ·"; font-weight: 700; }
+      .stat.burnout.high dt::after { content: " !"; font-weight: 700; }
+      @keyframes warn { 50% { box-shadow: 0 0 0 3px rgba(160, 82, 45, 0.25); } }
+
+      /* Floating +/- numbers next to stats */
+      .stat dd { position: relative; }
+      .floater {
+        position: absolute;
+        right: 0;
+        top: -0.2rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        pointer-events: none;
+        animation: float-up 1.4s ease-out forwards;
+      }
+      .floater.up { color: #2f8f4e; }
+      .floater.down { color: #c23b3b; }
+      @keyframes float-up {
+        0% { opacity: 0; transform: translateY(0.4rem); }
+        15% { opacity: 1; }
+        100% { opacity: 0; transform: translateY(-1.4rem); }
+      }
+      .skill.bump, .interest.bump { animation: bump 0.9s ease-out; }
+      @keyframes bump { 30% { transform: scale(1.04); } }
+
+      /* Weather and time of day inside the game area */
+      .campus { position: absolute; inset: 0; pointer-events: none; }
+      .campus svg { display: block; width: 100%; height: 100%; }
+      .campus .label { font: 600 13px Georgia, serif; letter-spacing: 0.12em; fill: #6d6455; }
+      .campus .win { fill: #cfd9df; transition: fill 1.5s; }
+      .campus .lamp { transition: fill 1.5s; }
+      .game.night-time .campus .win { fill: #f6d77c; }
+      .game.night-time .campus .lamp { fill: #ffe9a8; filter: drop-shadow(0 0 6px #ffd65a); }
+      .campus .splash { animation: splash 2.4s ease-in-out infinite; transform-origin: 500px 300px; }
+      @keyframes splash { 50% { transform: scale(1.6); opacity: 0.6; } }
+      @media (prefers-reduced-motion: reduce) { .campus .splash { animation: none; } }
+      .sky { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      .sky .night { position: absolute; inset: 0; background: #141a33; opacity: 0; transition: opacity 1.5s linear; }
+      .sky .sun {
+        position: absolute; right: -6rem; top: -6rem; width: 22rem; height: 22rem; border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 210, 110, 0.45), rgba(255, 210, 110, 0) 65%);
+        opacity: 0; transition: opacity 1.5s;
+        animation: glow 6s ease-in-out infinite;
+      }
+      @keyframes glow { 50% { transform: scale(1.08); } }
+      .sky .cloud {
+        position: absolute; width: 11rem; height: 3.2rem; border-radius: 999px;
+        background: rgba(255, 255, 255, 0.75); filter: blur(6px); opacity: 0; transition: opacity 1.5s;
+        animation: drift linear infinite;
+      }
+      .sky .cloud.c1 { top: 22%; animation-duration: 70s; }
+      .sky .cloud.c2 { top: 48%; width: 15rem; animation-duration: 95s; animation-delay: -40s; }
+      .sky .cloud.c3 { top: 70%; width: 9rem; animation-duration: 60s; animation-delay: -20s; }
+      @keyframes drift { from { left: -16rem; } to { left: 100%; } }
+      .sky .rain {
+        position: absolute; inset: -40% 0 0 0; opacity: 0; transition: opacity 1.2s;
+        background-image: repeating-linear-gradient(105deg, rgba(47, 95, 138, 0) 0 9px, rgba(47, 95, 138, 0.35) 9px 10px, rgba(47, 95, 138, 0) 10px 22px);
+        background-size: 100% 60px;
+        animation: rain 0.5s linear infinite;
+      }
+      @keyframes rain { to { background-position: -12px 60px; } }
+      .sky .flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+      .sky.sunny .sun, .sky.partlyCloudy .sun { opacity: 1; }
+      .sky.partlyCloudy .sun { opacity: 0.55; }
+      .sky.partlyCloudy .c1, .sky.partlyCloudy .c3 { opacity: 0.8; }
+      .sky.cloudy .cloud, .sky.rain .cloud, .sky.storm .cloud { opacity: 0.9; }
+      .sky.cloudy, .sky.rain, .sky.storm { background: rgba(120, 125, 135, 0.08); }
+      .sky.rain .cloud, .sky.storm .cloud { background: rgba(170, 175, 185, 0.6); }
+      .sky.rain .rain { opacity: 1; }
+      .sky.storm { background: rgba(60, 64, 80, 0.16); }
+      .sky.storm .rain { opacity: 1; animation-duration: 0.3s; }
+      .sky.storm .flash { animation: lightning 7s infinite; }
+      @keyframes lightning { 0%, 90%, 94%, 100% { opacity: 0; } 91% { opacity: 0.55; } 92% { opacity: 0.1; } 93% { opacity: 0.4; } }
+      .sky.night-on .sun { opacity: 0 !important; }
+
+      .actor .dot { transition: transform 0.2s; }
+      .actor.walking .dot { animation: step 0.36s ease-in-out infinite; }
+      @keyframes step { 50% { transform: translateY(-3px); } }
+      .weather.changed { animation: pop 0.6s ease-out; }
+      @keyframes pop { 40% { transform: scale(1.12); } }
+
+      .toast {
+        position: absolute; z-index: 2; left: 50%; bottom: 0.85rem; max-width: min(30rem, 60%);
+        padding: 0.5rem 0.9rem; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper);
+        font-size: 0.9rem; line-height: 1.35; pointer-events: none;
+        transform: translate(-50%, 160%); opacity: 0;
+        transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s;
+      }
+      .toast.show { transform: translate(-50%, 0); opacity: 1; }
+      .toast strong { display: block; font-weight: 500; }
+      .toast span { color: #5c564e; }
+      .weather-note { display: block; margin-top: 0.15rem; font-size: 0.8rem; font-weight: 700; }
+      .weather-note.good { color: #2f8f4e !important; }
+      .weather-note.bad { color: #c23b3b !important; }
+      @media (prefers-reduced-motion: reduce) {
+        .sky *, .actor.walking .dot, .floater, .skill.bump, .weather.changed, .stat.burnout.high dd .bar { animation: none !important; }
+        .floater { display: none; }
+      }
+      .popup {
+        position: fixed;
+        inset: 0;
+        z-index: 5;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: rgba(28, 25, 21, 0.35);
+      }
+      .popup[hidden] { display: none; }
+      .popup-card {
+        width: min(28rem, 100%);
+        background: var(--paper);
+        border: 2px solid var(--ink);
+        border-radius: 12px;
+        padding: 1.1rem 1.15rem 1.15rem;
+      }
+      .popup-card h2 { margin: 0 0 0.45rem; font-size: 1.35rem; font-weight: 500; }
+      .popup-card p { margin: 0 0 0.9rem; line-height: 1.45; }
+      .popup-card .popup-memory { margin-top: -0.4rem; font-size: 0.85rem; color: #8a2f1c; }
+      .popup-memory[hidden] { display: none; }
+      .actor {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15rem;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+      }
+      .actor .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid var(--ink);
+      }
+      .actor .name { font-size: 0.75rem; padding: 0 0.3rem; border-radius: 5px; background: rgba(255, 253, 248, 0.82); }
+      .actor .say {
+        position: absolute;
+        bottom: calc(100% + 4px);
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 11rem;
+        width: max-content;
+        padding: 0.15rem 0.45rem;
+        border: 1.5px solid var(--ink);
+        border-radius: 8px;
+        background: #fff;
+        font-size: 0.7rem;
+        line-height: 1.25;
+        text-align: center;
+        animation: say-in 0.25s ease-out;
+        pointer-events: none;
+      }
+      .actor .say::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -4px;
+        border: 4px solid transparent;
+        border-top-color: var(--ink);
+      }
+      @keyframes say-in { from { opacity: 0; transform: translate(-50%, 4px); } }
+      /* In a two-person chat the left speaker's bubble grows left and the right one's grows right. */
+      .actor .say.to-left { left: auto; right: 50%; transform: translateX(10px); border-bottom-right-radius: 2px; animation: none; }
+      .actor .say.to-right { left: 50%; transform: translateX(-10px); border-bottom-left-radius: 2px; animation: none; }
+      .actor .say.to-left::after { left: auto; right: 4px; margin-left: 0; }
+      .actor .say.to-right::after { left: 4px; margin-left: 0; }
+      .actor .say.emoji { padding: 0 0.3rem; font-size: 1rem; line-height: 1.4; }
+      .actor.chatting .dot { box-shadow: 0 0 0 4px rgba(28, 25, 21, 0.1); }
+      .actor.leaving { animation: fade-away 0.9s ease-in forwards; }
+      .actor.arriving { animation: fade-in 0.9s ease-out; }
+      @keyframes fade-away { to { opacity: 0; filter: blur(2px); transform: translate(-50%, -50%) scale(0.6); } }
+      @keyframes fade-in { from { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } }
+      @media (prefers-reduced-motion: reduce) {
+        .actor.leaving, .actor.arriving { animation: none; }
+        .actor.leaving { opacity: 0; }
+      }
+      .player-token .dot {
+        width: 18px;
+        height: 18px;
+        background: var(--ink);
+        box-shadow: 0 0 0 7px rgba(28, 25, 21, 0.08);
+      }
+      .captain .dot { background: var(--energy); }
+      .spark .dot { background: var(--happiness); }
+      .sage .dot { background: var(--money); }
+      .chat {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        height: 100%;
+        border-width: 0 0 0 2px;
+        padding: 1rem 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .chat h2, .player h2, .choices h2 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 500;
+      }
+      .feed {
+        list-style: none;
+        margin: 0.7rem -0.25rem 0;
+        padding: 0 0.25rem 0.5rem;
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .feed li { animation: bubble-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+      @keyframes bubble-in { from { opacity: 0; transform: translateY(10px) scale(0.97); } }
+      .feed .note {
+        align-self: center;
+        max-width: 95%;
+        padding: 0.25rem 0.7rem;
+        border-radius: 999px;
+        background: #efe8dc;
+        color: #4f4a43;
+        font-size: 0.8rem;
+        text-align: center;
+        line-height: 1.35;
+      }
+      .feed-title { text-align: center; }
+      .feed-wrap { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .feed-new {
+        position: absolute; left: 50%; bottom: 0.6rem; transform: translateX(-50%);
+        padding: 0.3rem 0.8rem; border-radius: 999px; font-size: 0.82rem; text-align: center;
+        background: var(--ink); color: var(--paper); box-shadow: 0 4px 12px rgba(28, 25, 21, 0.2);
+      }
+      .feed-new:hover:not(:disabled) { background: #3a352e; }
+      .feed-new[hidden] { display: none; }
+      .feed .note.day { background: var(--ink); color: var(--paper); font-size: 0.85rem; margin-top: 0.4rem; }
+      .feed .note.warn { background: #f6dcd2; color: #8a2f1c; }
+      .feed .note.world { border-radius: 10px; background: transparent; border: 1.5px dashed #b9b1a4; font-style: italic; }
+      .bubble {
+        max-width: 88%;
+        padding: 0.5rem 0.75rem 0.55rem;
+        border: 2px solid var(--ink);
+        border-radius: 14px;
+        line-height: 1.4;
+        font-size: 0.92rem;
+      }
+      .bubble .who { display: block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em; margin-bottom: 0.1rem; }
+      .bubble .when { font-weight: 400; color: #8a847b; margin-left: 0.35rem; }
+      .bubble .detail { display: block; margin-top: 0.15rem; font-size: 0.8rem; color: #5c564e; }
+      .bubble.sam { align-self: flex-end; background: var(--ink); color: var(--paper); border-bottom-right-radius: 4px; }
+      .bubble.sam .who, .bubble.sam .when, .bubble.sam .detail { color: #d9d2c5; }
+      .bubble.npc { align-self: flex-start; background: #fff; border-bottom-left-radius: 4px; white-space: pre-wrap; }
+      .bubble.npc.captain .who { color: var(--energy); }
+      .bubble.npc.spark .who { color: var(--happiness); }
+      .typing span { display: inline-block; width: 6px; height: 6px; margin-right: 3px; border-radius: 50%; background: #8a847b; animation: typing 1s infinite; }
+      .typing span:nth-child(2) { animation-delay: 0.15s; }
+      .typing span:nth-child(3) { animation-delay: 0.3s; }
+      @keyframes typing { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-4px); opacity: 1; } }
+      @media (prefers-reduced-motion: reduce) { .feed li, .typing span { animation: none; } .feed { scroll-behavior: auto; } }
+      .chat a {
+        margin-top: auto;
+        padding-top: 1rem;
+        color: var(--ink);
+      }
+      .dock {
+        grid-column: 1;
+        grid-row: 2;
+        display: grid;
+        grid-template-columns: minmax(15.5rem, 17.5rem) minmax(0, 1fr);
+        min-height: 0;
+        overflow: hidden;
+      }
+      .player {
+        border-width: 0 2px 0 0;
+        padding: 0.75rem 1rem 1rem;
+        min-height: 0;
+        overflow-y: auto;
+        align-content: start;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto auto 1fr;
+        column-gap: 0.8rem;
+      }
+      .player > .icon { grid-column: 1; grid-row: 1; align-self: start; }
+      .stats {
+        grid-column: 1;
+        grid-row: 2;
+        margin: 0.7rem 0 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      .stat {
+        display: grid;
+        grid-template-columns: 5.4rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .stat dt, .stat dd { margin: 0; font-size: 1.05rem; }
+      .stat dd {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .bar {
+        flex: 1;
+        height: 0.7rem;
+        border: 1.5px solid currentColor;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .bar .fill {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: currentColor;
+        transition: width 0.3s ease;
+      }
+      .pips { flex: 1; display: flex; gap: 0.2rem; }
+      .pip {
+        flex: 1;
+        height: 0.7rem;
+        border: 1.5px solid currentColor;
+        border-radius: 3px;
+        background: #fff;
+      }
+      .pip.on { background: currentColor; }
+      .num { min-width: 2.6rem; text-align: right; font-size: 0.85rem; }
+      .final-stats { margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+      #end-popup .popup-card.wide { width: min(52rem, 100%); max-height: calc(100vh - 2rem); overflow-y: auto; }
+      .end-layout { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+      @media (max-width: 700px) { .end-layout { grid-template-columns: 1fr; } }
+      .month { margin: 0 0 1rem; }
+      .month h3 { margin: 0 0 0.15rem; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #6d675f; }
+      .month .source { margin: 0 0 0.6rem; font-size: 0.78rem; color: #8a847b; }
+      .month-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.6rem 0.9rem; }
+      .spark-chart { position: relative; }
+      .spark-chart .head { display: flex; justify-content: space-between; font-size: 0.82rem; }
+      .spark-chart .head span:last-child { color: #5c564e; font-variant-numeric: tabular-nums; }
+      .spark-chart svg { display: block; width: 100%; height: 72px; overflow: visible; }
+      .spark-chart .grid line { stroke: #e6dfd2; stroke-width: 1; }
+      .spark-chart .axis text { fill: #8a847b; font-size: 9px; }
+      .spark-chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+      .spark-chart .cross { stroke: #8a847b; stroke-width: 1; }
+      .spark-chart .hit { fill: transparent; cursor: crosshair; }
+      .spark-chart .tip {
+        position: absolute; top: 1.35rem; transform: translateX(-50%); padding: 0.1rem 0.4rem; border: 1.5px solid var(--ink);
+        border-radius: 6px; background: var(--paper); font-size: 0.72rem; white-space: nowrap; pointer-events: none;
+      }
+      .spark-chart .tip[hidden] { display: none; }
+      /* End-of-game recap */
+      .end-style { margin: -0.3rem 0 0.8rem; font-size: 0.95rem; color: #4f4a43; }
+      .end-style strong { font-weight: 700; color: var(--ink); }
+      .tabs { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0 0 0.9rem; border-bottom: 2px solid var(--ink); }
+      .tabs button {
+        padding: 0.35rem 0.8rem; border: 2px solid transparent; border-bottom: none; border-radius: 8px 8px 0 0;
+        margin-bottom: -2px; background: transparent; font: inherit; font-size: 0.92rem; text-align: center; cursor: pointer;
+      }
+      .tabs button[aria-selected="true"] { border-color: var(--ink); background: var(--paper); font-weight: 700; }
+      .tabs button:hover:not([aria-selected="true"]) { background: #f1ebe0; }
+      .tab-panel { min-height: 16rem; }
+      .tab-panel[hidden] { display: none; }
+      .panel-intro { margin: 0 0 0.7rem; font-size: 0.88rem; color: #5c564e; }
+      .highlights, .memories { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+      .highlights li {
+        display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 0.7rem; align-items: center;
+        padding: 0.55rem 0.75rem; border: 1.5px solid #d8d0c3; border-left: 5px solid #8a847b; border-radius: 10px; background: #fff;
+      }
+      .highlights li.good { border-left-color: #2f7a45; }
+      .highlights li.bad { border-left-color: #b23a2e; }
+      .highlights li.mixed { border-left-color: #b86e12; }
+      .highlights .cause { font-size: 0.88rem; color: #4f4a43; }
+      .highlights .cause b { display: block; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: #8a847b; font-weight: 500; }
+      .highlights .arrow { font-size: 1.2rem; color: #8a847b; }
+      .highlights .effect { font-size: 0.95rem; }
+      .highlights .effect b { display: block; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 500; }
+      .highlights li.good .effect b { color: #2f7a45; }
+      .highlights li.bad .effect b { color: #b23a2e; }
+      .highlights li.mixed .effect b { color: #b86e12; }
+      .highlights li.neutral .effect b { color: #8a847b; }
+      @media (max-width: 640px) { .highlights li { grid-template-columns: 1fr; } .highlights .arrow { transform: rotate(90deg); justify-self: start; } }
+      .impact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr)); gap: 0.55rem; }
+      .person-card { padding: 0.55rem 0.7rem; border: 1.5px solid #d8d0c3; border-radius: 10px; background: #fff; font-size: 0.85rem; }
+      .person-card header { display: flex; align-items: center; gap: 0.45rem; }
+      .person-card .dot { width: 0.8rem; height: 0.8rem; border-radius: 50%; border: 1.5px solid var(--ink); flex: none; }
+      .person-card .who { font-size: 1rem; }
+      .person-card .role { color: #8a847b; font-size: 0.78rem; }
+      .person-card .verdict { display: inline-block; margin: 0.35rem 0 0.25rem; padding: 0 0.4rem; border-radius: 6px; background: #efe8dc; font-size: 0.78rem; }
+      .person-card .mood { font-variant-numeric: tabular-nums; }
+      .person-card .up { color: #2f7a45; font-weight: 700; }
+      .person-card .down { color: #b23a2e; font-weight: 700; }
+      .person-card p { margin: 0.15rem 0 0; color: #4f4a43; }
+      .decisions { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.1rem; }
+      @media (max-width: 700px) { .decisions { grid-template-columns: 1fr; } }
+      .decisions h4 { margin: 0 0 0.4rem; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #6d675f; }
+      .decisions section + section { margin-top: 0.9rem; }
+      .time-bars { display: flex; flex-direction: column; gap: 0.3rem; }
+      .time-bar { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) 3.2rem; gap: 0.5rem; align-items: center; font-size: 0.85rem; }
+      .time-bar .track { height: 0.6rem; border-radius: 4px; background: #efe8dc; overflow: hidden; }
+      .time-bar .fill { display: block; height: 100%; border-radius: 0 4px 4px 0; background: #6b5ca5; }
+      .time-bar .val { text-align: right; color: #4f4a43; font-variant-numeric: tabular-nums; }
+      .insights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.88rem; }
+      .insights li { display: grid; grid-template-columns: 1.2rem minmax(0, 1fr); }
+      .insights .mark { font-weight: 700; }
+      .insights .good .mark { color: #2f7a45; }
+      .insights .bad .mark { color: #b23a2e; }
+      .insights .mixed .mark { color: #b86e12; }
+      .insights .neutral .mark { color: #8a847b; }
+      .mini-list { margin: 0; padding-left: 1.1rem; font-size: 0.88rem; }
+      .memories li { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.6rem; font-size: 0.9rem; padding-bottom: 0.45rem; border-bottom: 1px solid #ece5d8; }
+      .memories .when { color: #8a847b; font-size: 0.8rem; font-variant-numeric: tabular-nums; padding-top: 0.1rem; }
+      .memories .why { display: block; margin-top: 0.1rem; color: #8a847b; font-size: 0.8rem; }
+      .memories .warning .what::before { content: "⚠ "; color: #b23a2e; }
+      .memories .growth .what::before { content: "↑ "; color: #2f7a45; }
+      .memories .people .what::before { content: "☺ "; color: #6b5ca5; }
+      .memories .job .what::before { content: "$ "; color: #2f7a45; }
+      .memories .first .what::before { content: "★ "; color: #b86e12; }
+      .feed .note.chain { background: #ece6fb; color: #3d2f78; }
+      .feed .note.chain a { color: inherit; font-weight: 700; margin-left: 0.3rem; }
+      .feed .note.chain.failed { background: #f6dcd2; color: #8a2f1c; }
+      .final-stats div { display: flex; justify-content: space-between; }
+      .final-stats dt, .final-stats dd { margin: 0; }
+      .health { color: var(--health); }
+      .hunger { color: #b86e12; }
+      .stat.money dd { font-size: 1.05rem; }
+      .happiness { color: var(--happiness); }
+      .money { color: var(--money); }
+      .energy { color: var(--energy); }
+      .icon, .skills {
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .icon {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.45rem 0.75rem;
+      }
+      .icon svg { flex: none; }
+      .icon span { font-size: 1.2rem; }
+      .icon .who-box { display: flex; flex-direction: column; line-height: 1.15; }
+      .icon .occupation { font-size: 0.78rem; color: #5c564e; letter-spacing: 0.02em; }
+      .skills {
+        grid-column: 1;
+        grid-row: 3;
+        align-self: start;
+        margin-top: 0.8rem;
+        padding: 0.55rem 0.7rem 0.65rem;
+        color: #4f4a43;
+      }
+      .skills h3 { margin: 0 0 0.45rem; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #6d675f; }
+      .skills dl { margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+      .skill dt { display: flex; justify-content: space-between; font-size: 0.82rem; }
+      .skill dt span { font-variant-numeric: tabular-nums; }
+      .skill dd { margin: 0.12rem 0 0; }
+      .skill .bar { display: block; height: 0.45rem; border-width: 1.5px; color: #6b5ca5; }
+      .skill .bar .fill { background: #6b5ca5; }
+      .skill.bump dt span { color: #6b5ca5; font-weight: 700; }
+      .interests h3 { margin-top: 0.85rem; }
+      .interests[hidden] { display: none; }
+      .interest .bar, .interest .bar .fill { color: #2f7f7a; background-color: #2f7f7a; }
+      .interest .bar { background: #fff; }
+      .interest.bump dt span { color: #2f7f7a; font-weight: 700; }
+      .interest dd small { display: block; margin-top: 0.1rem; color: #8a847b; font-size: 0.72rem; }
+      .event-done { font-weight: 700; color: #4f4a43 !important; }
+      .event-done[hidden] { display: none; }
+      .event-tag { display: inline-block; margin-right: 0.3rem; padding: 0 0.35rem; border-radius: 6px; background: #efe8dc; color: #4f4a43; font-size: 0.8rem; }
+      .choices {
+        border-width: 0;
+        padding: 0.75rem 1.1rem 1rem;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      .choices h2 { margin-bottom: 0.5rem; }
+      .choice-list { display: flex; flex-direction: column; gap: 0.65rem; }
+      #roam-choices {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+        gap: 0.4rem;
+      }
+      #roam-choices button { padding: 0.35rem 0.6rem 0.4rem; border-width: 1.5px; border-radius: 8px; display: flex; flex-direction: column; justify-content: flex-start; }
+      #roam-choices button strong { font-size: 0.92rem; line-height: 1.25; }
+      #roam-choices button > span:not(.event-done) { margin-top: 0.05rem; font-size: 0.72rem; line-height: 1.3; }
+      #roam-choices .weather-note { font-size: 0.7rem; margin-top: 0.05rem; }
+      #roam-choices .event-tag { font-size: 0.7rem; padding: 0 0.3rem; }
+      #roam-choices strong .time-tag { display: inline; margin: 0 0 0 0.2rem; padding: 0 0.3rem; border-radius: 6px; background: #efe8dc; font-size: 0.72rem; font-weight: 700; color: #4f4a43; white-space: nowrap; vertical-align: 1px; }
+      #roam-choices button > span.likes { color: #2f7a45 !important; }
+      #roam-choices button > span.dislikes { color: #b23a2e !important; }
+      button {
+        font: inherit;
+        text-align: left;
+        background: #fff;
+        color: var(--ink);
+        border: 2px solid var(--line);
+        border-radius: 10px;
+        padding: 0.7rem 0.85rem;
+        cursor: pointer;
+      }
+      button strong { display: block; font-weight: 500; font-size: 1.05rem; }
+      button span { display: block; margin-top: 0.15rem; color: #5c564e; font-size: 0.92rem; }
+      button:hover:not(:disabled) { background: #f6f1e8; }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      @media (max-width: 800px) {
+        body {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto auto;
+          height: auto;
+          overflow: visible;
+        }
+        .game { min-height: 22rem; }
+        .dock { overflow: visible; }
+        .player, .choices { overflow: visible; }
+        .chat {
+          grid-column: 1;
+          grid-row: 3;
+          border-width: 2px 0 0 0;
+          min-height: 14rem;
+          height: 24rem;
+          position: static;
+        }
+        .dock { grid-template-columns: 1fr; }
+        .player { border-width: 0 0 2px 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="game" aria-label="Game">
+      <div class="daybar">
+        <div class="timeline" id="clock" role="meter" aria-label="Time of day" aria-valuemin="0" aria-valuemax="24" aria-valuenow="7" aria-valuetext="7:00 AM">
+          <span class="now" id="now"></span>
+        </div>
+        <div class="ticks" aria-hidden="true">
+          <span style="left: 0%">12 AM</span>
+          <span style="left: 25%">6 AM</span>
+          <span style="left: 50%">12 PM</span>
+          <span style="left: 75%">6 PM</span>
+          <span style="left: 100%">12 AM</span>
+        </div>
+        <div class="day-row">
+          <p class="day"><span id="day">October 1</span><span class="weekday" id="weekday">Thursday</span></p>
+          <div class="weather" id="weather" role="img" aria-label="Weather">
+            <span id="weather-icon"></span>
+            <span id="weather-label"></span>
+          </div>
+        </div>
+      </div>
+      <div class="day-drop" id="day-drop" aria-live="polite"><strong id="day-drop-name"></strong><span id="day-drop-date"></span></div>
+      <div class="game-buttons">
+        <button id="pause-game" type="button" aria-keyshortcuts="P">Pause</button>
+        <button class="end-game" id="end-game" type="button">End game early</button>
+      </div>
+      <div class="pause-overlay" id="pause-overlay" hidden>
+        <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+          <h2 id="pause-title">Paused</h2>
+          <p>Time is stopped.</p>
+          <button id="resume-game" type="button"><strong>Resume</strong></button>
+          <p class="key">Press P or Esc to resume</p>
+        </div>
+      </div>
+      <!-- The campus: library, science hall, student union and dining hall around the quad. -->
+      <div class="campus" aria-hidden="true"><svg viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg"><rect width="1000" height="520" fill="#e3ead3"/><circle cx="236" cy="116" r="1.6" fill="#d3ddc0"/><circle cx="396" cy="140" r="1.6" fill="#d3ddc0"/><circle cx="67" cy="251" r="1.6" fill="#d3ddc0"/><circle cx="918" cy="430" r="1.6" fill="#d3ddc0"/><circle cx="765" cy="170" r="1.6" fill="#d3ddc0"/><circle cx="537" cy="195" r="1.6" fill="#d3ddc0"/><circle cx="173" cy="118" r="1.6" fill="#d3ddc0"/><circle cx="214" cy="487" r="1.6" fill="#d3ddc0"/><circle cx="829" cy="433" r="1.6" fill="#d3ddc0"/><circle cx="800" cy="157" r="1.6" fill="#d3ddc0"/><circle cx="310" cy="352" r="1.6" fill="#d3ddc0"/><circle cx="732" cy="455" r="1.6" fill="#d3ddc0"/><circle cx="880" cy="109" r="1.6" fill="#d3ddc0"/><circle cx="606" cy="372" r="1.6" fill="#d3ddc0"/><circle cx="506" cy="150" r="1.6" fill="#d3ddc0"/><circle cx="474" cy="110" r="1.6" fill="#d3ddc0"/><circle cx="935" cy="459" r="1.6" fill="#d3ddc0"/><circle cx="548" cy="205" r="1.6" fill="#d3ddc0"/><circle cx="909" cy="328" r="1.6" fill="#d3ddc0"/><circle cx="882" cy="452" r="1.6" fill="#d3ddc0"/><circle cx="508" cy="256" r="1.6" fill="#d3ddc0"/><circle cx="599" cy="264" r="1.6" fill="#d3ddc0"/><circle cx="161" cy="207" r="1.6" fill="#d3ddc0"/><circle cx="813" cy="89" r="1.6" fill="#d3ddc0"/><circle cx="46" cy="352" r="1.6" fill="#d3ddc0"/><circle cx="280" cy="311" r="1.6" fill="#d3ddc0"/><circle cx="471" cy="224" r="1.6" fill="#d3ddc0"/><circle cx="997" cy="158" r="1.6" fill="#d3ddc0"/><circle cx="413" cy="161" r="1.6" fill="#d3ddc0"/><circle cx="633" cy="194" r="1.6" fill="#d3ddc0"/><circle cx="356" cy="406" r="1.6" fill="#d3ddc0"/><circle cx="321" cy="321" r="1.6" fill="#d3ddc0"/><circle cx="904" cy="115" r="1.6" fill="#d3ddc0"/><circle cx="62" cy="173" r="1.6" fill="#d3ddc0"/><circle cx="765" cy="347" r="1.6" fill="#d3ddc0"/><circle cx="237" cy="219" r="1.6" fill="#d3ddc0"/><circle cx="178" cy="277" r="1.6" fill="#d3ddc0"/><circle cx="43" cy="384" r="1.6" fill="#d3ddc0"/><circle cx="896" cy="500" r="1.6" fill="#d3ddc0"/><circle cx="735" cy="502" r="1.6" fill="#d3ddc0"/><circle cx="18" cy="200" r="1.6" fill="#d3ddc0"/><circle cx="966" cy="419" r="1.6" fill="#d3ddc0"/><circle cx="410" cy="494" r="1.6" fill="#d3ddc0"/><circle cx="621" cy="438" r="1.6" fill="#d3ddc0"/><circle cx="293" cy="156" r="1.6" fill="#d3ddc0"/><circle cx="444" cy="131" r="1.6" fill="#d3ddc0"/><circle cx="382" cy="503" r="1.6" fill="#d3ddc0"/><circle cx="331" cy="74" r="1.6" fill="#d3ddc0"/><circle cx="45" cy="146" r="1.6" fill="#d3ddc0"/><circle cx="784" cy="233" r="1.6" fill="#d3ddc0"/><circle cx="290" cy="114" r="1.6" fill="#d3ddc0"/><circle cx="982" cy="261" r="1.6" fill="#d3ddc0"/><circle cx="208" cy="97" r="1.6" fill="#d3ddc0"/><circle cx="55" cy="146" r="1.6" fill="#d3ddc0"/><circle cx="677" cy="137" r="1.6" fill="#d3ddc0"/><circle cx="41" cy="291" r="1.6" fill="#d3ddc0"/><circle cx="249" cy="519" r="1.6" fill="#d3ddc0"/><circle cx="122" cy="308" r="1.6" fill="#d3ddc0"/><circle cx="774" cy="254" r="1.6" fill="#d3ddc0"/><circle cx="988" cy="285" r="1.6" fill="#d3ddc0"/><circle cx="242" cy="255" r="1.6" fill="#d3ddc0"/><circle cx="37" cy="260" r="1.6" fill="#d3ddc0"/><circle cx="249" cy="470" r="1.6" fill="#d3ddc0"/><circle cx="831" cy="294" r="1.6" fill="#d3ddc0"/><circle cx="32" cy="184" r="1.6" fill="#d3ddc0"/><circle cx="242" cy="164" r="1.6" fill="#d3ddc0"/><circle cx="231" cy="461" r="1.6" fill="#d3ddc0"/><circle cx="142" cy="93" r="1.6" fill="#d3ddc0"/><circle cx="928" cy="324" r="1.6" fill="#d3ddc0"/><circle cx="991" cy="251" r="1.6" fill="#d3ddc0"/><circle cx="901" cy="364" r="1.6" fill="#d3ddc0"/><circle cx="791" cy="405" r="1.6" fill="#d3ddc0"/><circle cx="494" cy="112" r="1.6" fill="#d3ddc0"/><circle cx="211" cy="463" r="1.6" fill="#d3ddc0"/><circle cx="900" cy="486" r="1.6" fill="#d3ddc0"/><circle cx="337" cy="366" r="1.6" fill="#d3ddc0"/><circle cx="800" cy="359" r="1.6" fill="#d3ddc0"/><circle cx="815" cy="308" r="1.6" fill="#d3ddc0"/><circle cx="655" cy="379" r="1.6" fill="#d3ddc0"/><circle cx="268" cy="485" r="1.6" fill="#d3ddc0"/><circle cx="956" cy="103" r="1.6" fill="#d3ddc0"/><circle cx="971" cy="503" r="1.6" fill="#d3ddc0"/><circle cx="668" cy="90" r="1.6" fill="#d3ddc0"/><circle cx="899" cy="127" r="1.6" fill="#d3ddc0"/><circle cx="969" cy="370" r="1.6" fill="#d3ddc0"/><circle cx="60" cy="145" r="1.6" fill="#d3ddc0"/><circle cx="635" cy="326" r="1.6" fill="#d3ddc0"/><circle cx="746" cy="487" r="1.6" fill="#d3ddc0"/><circle cx="219" cy="71" r="1.6" fill="#d3ddc0"/><circle cx="922" cy="76" r="1.6" fill="#d3ddc0"/><circle cx="876" cy="122" r="1.6" fill="#d3ddc0"/><circle cx="810" cy="422" r="1.6" fill="#d3ddc0"/><circle cx="878" cy="318" r="1.6" fill="#d3ddc0"/><circle cx="879" cy="161" r="1.6" fill="#d3ddc0"/><circle cx="671" cy="219" r="1.6" fill="#d3ddc0"/><circle cx="892" cy="418" r="1.6" fill="#d3ddc0"/><circle cx="472" cy="307" r="1.6" fill="#d3ddc0"/><circle cx="26" cy="85" r="1.6" fill="#d3ddc0"/><circle cx="594" cy="290" r="1.6" fill="#d3ddc0"/><circle cx="865" cy="344" r="1.6" fill="#d3ddc0"/><circle cx="139" cy="233" r="1.6" fill="#d3ddc0"/><circle cx="768" cy="305" r="1.6" fill="#d3ddc0"/><circle cx="11" cy="447" r="1.6" fill="#d3ddc0"/><circle cx="828" cy="108" r="1.6" fill="#d3ddc0"/><circle cx="543" cy="242" r="1.6" fill="#d3ddc0"/><circle cx="787" cy="210" r="1.6" fill="#d3ddc0"/><circle cx="234" cy="289" r="1.6" fill="#d3ddc0"/><circle cx="966" cy="113" r="1.6" fill="#d3ddc0"/><circle cx="114" cy="349" r="1.6" fill="#d3ddc0"/><circle cx="885" cy="301" r="1.6" fill="#d3ddc0"/><circle cx="434" cy="456" r="1.6" fill="#d3ddc0"/><circle cx="777" cy="100" r="1.6" fill="#d3ddc0"/><circle cx="881" cy="158" r="1.6" fill="#d3ddc0"/><circle cx="302" cy="446" r="1.6" fill="#d3ddc0"/><circle cx="422" cy="429" r="1.6" fill="#d3ddc0"/><circle cx="167" cy="463" r="1.6" fill="#d3ddc0"/><circle cx="176" cy="137" r="1.6" fill="#d3ddc0"/><circle cx="494" cy="222" r="1.6" fill="#d3ddc0"/><circle cx="542" cy="477" r="1.6" fill="#d3ddc0"/><circle cx="711" cy="73" r="1.6" fill="#d3ddc0"/><circle cx="312" cy="315" r="1.6" fill="#d3ddc0"/><circle cx="487" cy="392" r="1.6" fill="#d3ddc0"/><circle cx="484" cy="104" r="1.6" fill="#d3ddc0"/><circle cx="245" cy="451" r="1.6" fill="#d3ddc0"/><circle cx="357" cy="415" r="1.6" fill="#d3ddc0"/><circle cx="986" cy="352" r="1.6" fill="#d3ddc0"/><circle cx="677" cy="344" r="1.6" fill="#d3ddc0"/><circle cx="313" cy="481" r="1.6" fill="#d3ddc0"/><circle cx="467" cy="480" r="1.6" fill="#d3ddc0"/><circle cx="306" cy="460" r="1.6" fill="#d3ddc0"/><circle cx="787" cy="346" r="1.6" fill="#d3ddc0"/><circle cx="442" cy="133" r="1.6" fill="#d3ddc0"/><circle cx="771" cy="233" r="1.6" fill="#d3ddc0"/><circle cx="662" cy="130" r="1.6" fill="#d3ddc0"/><circle cx="83" cy="135" r="1.6" fill="#d3ddc0"/><circle cx="809" cy="150" r="1.6" fill="#d3ddc0"/><circle cx="902" cy="237" r="1.6" fill="#d3ddc0"/><circle cx="576" cy="228" r="1.6" fill="#d3ddc0"/><circle cx="621" cy="112" r="1.6" fill="#d3ddc0"/><circle cx="403" cy="491" r="1.6" fill="#d3ddc0"/><circle cx="180" cy="364" r="1.6" fill="#d3ddc0"/><circle cx="327" cy="205" r="1.6" fill="#d3ddc0"/><circle cx="23" cy="79" r="1.6" fill="#d3ddc0"/><circle cx="949" cy="443" r="1.6" fill="#d3ddc0"/><circle cx="801" cy="433" r="1.6" fill="#d3ddc0"/><circle cx="953" cy="141" r="1.6" fill="#d3ddc0"/><circle cx="584" cy="293" r="1.6" fill="#d3ddc0"/><circle cx="574" cy="492" r="1.6" fill="#d3ddc0"/><circle cx="760" cy="506" r="1.6" fill="#d3ddc0"/><circle cx="117" cy="363" r="1.6" fill="#d3ddc0"/><circle cx="675" cy="405" r="1.6" fill="#d3ddc0"/><circle cx="618" cy="444" r="1.6" fill="#d3ddc0"/><circle cx="303" cy="488" r="1.6" fill="#d3ddc0"/><circle cx="406" cy="340" r="1.6" fill="#d3ddc0"/><circle cx="897" cy="387" r="1.6" fill="#d3ddc0"/><circle cx="310" cy="174" r="1.6" fill="#d3ddc0"/><circle cx="327" cy="352" r="1.6" fill="#d3ddc0"/><circle cx="996" cy="475" r="1.6" fill="#d3ddc0"/><circle cx="400" cy="250" r="1.6" fill="#d3ddc0"/><circle cx="817" cy="198" r="1.6" fill="#d3ddc0"/><circle cx="412" cy="76" r="1.6" fill="#d3ddc0"/><circle cx="184" cy="313" r="1.6" fill="#d3ddc0"/><circle cx="693" cy="347" r="1.6" fill="#d3ddc0"/><circle cx="364" cy="498" r="1.6" fill="#d3ddc0"/><circle cx="623" cy="140" r="1.6" fill="#d3ddc0"/><circle cx="68" cy="508" r="1.6" fill="#d3ddc0"/><circle cx="988" cy="484" r="1.6" fill="#d3ddc0"/><circle cx="604" cy="211" r="1.6" fill="#d3ddc0"/><circle cx="91" cy="186" r="1.6" fill="#d3ddc0"/><circle cx="222" cy="488" r="1.6" fill="#d3ddc0"/><circle cx="893" cy="420" r="1.6" fill="#d3ddc0"/><circle cx="149" cy="177" r="1.6" fill="#d3ddc0"/><circle cx="299" cy="497" r="1.6" fill="#d3ddc0"/><circle cx="163" cy="426" r="1.6" fill="#d3ddc0"/><circle cx="681" cy="316" r="1.6" fill="#d3ddc0"/><circle cx="959" cy="188" r="1.6" fill="#d3ddc0"/><circle cx="524" cy="141" r="1.6" fill="#d3ddc0"/><circle cx="97" cy="84" r="1.6" fill="#d3ddc0"/><circle cx="317" cy="125" r="1.6" fill="#d3ddc0"/><circle cx="61" cy="517" r="1.6" fill="#d3ddc0"/><circle cx="289" cy="471" r="1.6" fill="#d3ddc0"/><circle cx="702" cy="399" r="1.6" fill="#d3ddc0"/><circle cx="655" cy="499" r="1.6" fill="#d3ddc0"/><circle cx="878" cy="394" r="1.6" fill="#d3ddc0"/><circle cx="560" cy="382" r="1.6" fill="#d3ddc0"/><circle cx="724" cy="319" r="1.6" fill="#d3ddc0"/><circle cx="503" cy="139" r="1.6" fill="#d3ddc0"/><circle cx="844" cy="288" r="1.6" fill="#d3ddc0"/><circle cx="68" cy="146" r="1.6" fill="#d3ddc0"/><circle cx="875" cy="185" r="1.6" fill="#d3ddc0"/><circle cx="391" cy="377" r="1.6" fill="#d3ddc0"/><circle cx="862" cy="218" r="1.6" fill="#d3ddc0"/><circle cx="387" cy="260" r="1.6" fill="#d3ddc0"/><circle cx="28" cy="464" r="1.6" fill="#d3ddc0"/><circle cx="19" cy="502" r="1.6" fill="#d3ddc0"/><circle cx="153" cy="141" r="1.6" fill="#d3ddc0"/><circle cx="849" cy="441" r="1.6" fill="#d3ddc0"/><circle cx="232" cy="319" r="1.6" fill="#d3ddc0"/><circle cx="477" cy="393" r="1.6" fill="#d3ddc0"/><circle cx="185" cy="441" r="1.6" fill="#d3ddc0"/><circle cx="996" cy="388" r="1.6" fill="#d3ddc0"/><circle cx="921" cy="492" r="1.6" fill="#d3ddc0"/><circle cx="379" cy="451" r="1.6" fill="#d3ddc0"/><circle cx="834" cy="334" r="1.6" fill="#d3ddc0"/><circle cx="107" cy="349" r="1.6" fill="#d3ddc0"/><circle cx="912" cy="207" r="1.6" fill="#d3ddc0"/><circle cx="647" cy="474" r="1.6" fill="#d3ddc0"/><circle cx="600" cy="87" r="1.6" fill="#d3ddc0"/><circle cx="632" cy="185" r="1.6" fill="#d3ddc0"/><circle cx="858" cy="368" r="1.6" fill="#d3ddc0"/><circle cx="307" cy="473" r="1.6" fill="#d3ddc0"/><circle cx="625" cy="223" r="1.6" fill="#d3ddc0"/><circle cx="834" cy="471" r="1.6" fill="#d3ddc0"/><circle cx="893" cy="467" r="1.6" fill="#d3ddc0"/><circle cx="658" cy="384" r="1.6" fill="#d3ddc0"/><circle cx="605" cy="307" r="1.6" fill="#d3ddc0"/><circle cx="987" cy="229" r="1.6" fill="#d3ddc0"/><circle cx="82" cy="391" r="1.6" fill="#d3ddc0"/><circle cx="498" cy="316" r="1.6" fill="#d3ddc0"/><circle cx="598" cy="182" r="1.6" fill="#d3ddc0"/><rect x="0" y="0" width="1000" height="64" fill="#e4dfd5"/><rect x="0" y="64" width="1000" height="6" fill="#d6cfc2"/><rect x="320" y="140" width="360" height="320" rx="28" fill="#d6e2c1" stroke="#c6d4ad" stroke-width="3"/><rect x="0" y="282" width="1000" height="36" fill="#efe7d6" stroke="#ddd2bd" stroke-width="2"/><rect x="482" y="70" width="36" height="450" fill="#efe7d6" stroke="#ddd2bd" stroke-width="2"/><path d="M332 152 L668 448" stroke="#efe7d6" stroke-width="22" stroke-linecap="round"/><path d="M668 152 L332 448" stroke="#efe7d6" stroke-width="22" stroke-linecap="round"/><rect x="150" y="225" width="24" height="60" fill="#efe7d6" stroke="#ddd2bd" stroke-width="2"/><rect x="830" y="225" width="24" height="60" fill="#efe7d6" stroke="#ddd2bd" stroke-width="2"/><rect x="150" y="318" width="24" height="52" fill="#efe7d6" stroke="#ddd2bd" stroke-width="2"/><rect x="830" y="318" width="24" height="52" fill="#efe7d6" stroke="#ddd2bd" stroke-width="2"/><circle cx="500" cy="300" r="46" fill="#e8e1d1" stroke="#d3c8b2" stroke-width="3"/><circle cx="500" cy="300" r="32" fill="#c9dde6" stroke="#a9c3cf" stroke-width="3"/><circle cx="500" cy="300" r="8" fill="#e8f1f5" class="splash"/><g class="bldg"><rect x="66" y="118" width="200" height="116" rx="6" fill="#000" opacity="0.07"/><rect x="60" y="110" width="200" height="116" rx="6" fill="#e6cdbb" stroke="#8f8576" stroke-width="2"/><rect x="60" y="110" width="200" height="22" rx="6" fill="#b98b72"/><rect x="60" y="126" width="200" height="6" fill="#b98b72"/><rect class="win" x="77" y="144" width="19" height="15" rx="2"/><rect class="win" x="107" y="144" width="19" height="15" rx="2"/><rect class="win" x="136" y="144" width="19" height="15" rx="2"/><rect class="win" x="165" y="144" width="19" height="15" rx="2"/><rect class="win" x="195" y="144" width="19" height="15" rx="2"/><rect class="win" x="224" y="144" width="19" height="15" rx="2"/><rect class="win" x="77" y="172" width="19" height="15" rx="2"/><rect class="win" x="107" y="172" width="19" height="15" rx="2"/><rect class="win" x="136" y="172" width="19" height="15" rx="2"/><rect class="win" x="165" y="172" width="19" height="15" rx="2"/><rect class="win" x="195" y="172" width="19" height="15" rx="2"/><rect class="win" x="224" y="172" width="19" height="15" rx="2"/><rect x="149" y="202" width="22" height="24" rx="3" fill="#7d6a58"/><text x="160" y="246" text-anchor="middle" class="label">LIBRARY</text></g><g class="bldg"><rect x="746" y="118" width="210" height="116" rx="6" fill="#000" opacity="0.07"/><rect x="740" y="110" width="210" height="116" rx="6" fill="#d5dde5" stroke="#8f8576" stroke-width="2"/><rect x="740" y="110" width="210" height="22" rx="6" fill="#8fa2b4"/><rect x="740" y="126" width="210" height="6" fill="#8fa2b4"/><rect class="win" x="758" y="144" width="20" height="15" rx="2"/><rect class="win" x="789" y="144" width="20" height="15" rx="2"/><rect class="win" x="820" y="144" width="20" height="15" rx="2"/><rect class="win" x="851" y="144" width="20" height="15" rx="2"/><rect class="win" x="882" y="144" width="20" height="15" rx="2"/><rect class="win" x="913" y="144" width="20" height="15" rx="2"/><rect class="win" x="758" y="172" width="20" height="15" rx="2"/><rect class="win" x="789" y="172" width="20" height="15" rx="2"/><rect class="win" x="820" y="172" width="20" height="15" rx="2"/><rect class="win" x="851" y="172" width="20" height="15" rx="2"/><rect class="win" x="882" y="172" width="20" height="15" rx="2"/><rect class="win" x="913" y="172" width="20" height="15" rx="2"/><rect x="834" y="202" width="22" height="24" rx="3" fill="#7d6a58"/><text x="845" y="246" text-anchor="middle" class="label">SCIENCE HALL</text></g><g class="bldg"><rect x="66" y="378" width="200" height="104" rx="6" fill="#000" opacity="0.07"/><rect x="60" y="370" width="200" height="104" rx="6" fill="#ecdcb9" stroke="#8f8576" stroke-width="2"/><rect x="60" y="370" width="200" height="22" rx="6" fill="#c2a36b"/><rect x="60" y="386" width="200" height="6" fill="#c2a36b"/><rect class="win" x="77" y="404" width="19" height="15" rx="2"/><rect class="win" x="107" y="404" width="19" height="15" rx="2"/><rect class="win" x="136" y="404" width="19" height="15" rx="2"/><rect class="win" x="165" y="404" width="19" height="15" rx="2"/><rect class="win" x="195" y="404" width="19" height="15" rx="2"/><rect class="win" x="224" y="404" width="19" height="15" rx="2"/><rect class="win" x="77" y="432" width="19" height="15" rx="2"/><rect class="win" x="107" y="432" width="19" height="15" rx="2"/><rect class="win" x="136" y="432" width="19" height="15" rx="2"/><rect class="win" x="165" y="432" width="19" height="15" rx="2"/><rect class="win" x="195" y="432" width="19" height="15" rx="2"/><rect class="win" x="224" y="432" width="19" height="15" rx="2"/><rect x="149" y="450" width="22" height="24" rx="3" fill="#7d6a58"/><text x="160" y="360" text-anchor="middle" class="label">STUDENT UNION</text></g><g class="bldg"><rect x="746" y="378" width="210" height="104" rx="6" fill="#000" opacity="0.07"/><rect x="740" y="370" width="210" height="104" rx="6" fill="#ecd0c2" stroke="#8f8576" stroke-width="2"/><rect x="740" y="370" width="210" height="22" rx="6" fill="#b88874"/><rect x="740" y="386" width="210" height="6" fill="#b88874"/><rect class="win" x="758" y="404" width="20" height="15" rx="2"/><rect class="win" x="789" y="404" width="20" height="15" rx="2"/><rect class="win" x="820" y="404" width="20" height="15" rx="2"/><rect class="win" x="851" y="404" width="20" height="15" rx="2"/><rect class="win" x="882" y="404" width="20" height="15" rx="2"/><rect class="win" x="913" y="404" width="20" height="15" rx="2"/><rect class="win" x="758" y="432" width="20" height="15" rx="2"/><rect class="win" x="789" y="432" width="20" height="15" rx="2"/><rect class="win" x="820" y="432" width="20" height="15" rx="2"/><rect class="win" x="851" y="432" width="20" height="15" rx="2"/><rect class="win" x="882" y="432" width="20" height="15" rx="2"/><rect class="win" x="913" y="432" width="20" height="15" rx="2"/><rect x="834" y="450" width="22" height="24" rx="3" fill="#7d6a58"/><text x="845" y="360" text-anchor="middle" class="label">DINING HALL</text></g><circle cx="303" cy="124" r="17" fill="#000" opacity="0.06"/><circle cx="300" cy="120" r="17" fill="#b4cc9a"/><circle cx="295" cy="115" r="9" fill="#c3d8ab"/><circle cx="703" cy="124" r="17" fill="#000" opacity="0.06"/><circle cx="700" cy="120" r="17" fill="#b4cc9a"/><circle cx="695" cy="115" r="9" fill="#c3d8ab"/><circle cx="303" cy="484" r="17" fill="#000" opacity="0.06"/><circle cx="300" cy="480" r="17" fill="#b4cc9a"/><circle cx="295" cy="475" r="9" fill="#c3d8ab"/><circle cx="703" cy="484" r="17" fill="#000" opacity="0.06"/><circle cx="700" cy="480" r="17" fill="#b4cc9a"/><circle cx="695" cy="475" r="9" fill="#c3d8ab"/><circle cx="333" cy="234" r="17" fill="#000" opacity="0.06"/><circle cx="330" cy="230" r="17" fill="#b4cc9a"/><circle cx="325" cy="225" r="9" fill="#c3d8ab"/><circle cx="673" cy="234" r="17" fill="#000" opacity="0.06"/><circle cx="670" cy="230" r="17" fill="#b4cc9a"/><circle cx="665" cy="225" r="9" fill="#c3d8ab"/><circle cx="333" cy="374" r="17" fill="#000" opacity="0.06"/><circle cx="330" cy="370" r="17" fill="#b4cc9a"/><circle cx="325" cy="365" r="9" fill="#c3d8ab"/><circle cx="673" cy="374" r="17" fill="#000" opacity="0.06"/><circle cx="670" cy="370" r="17" fill="#b4cc9a"/><circle cx="665" cy="365" r="9" fill="#c3d8ab"/><circle cx="43" cy="304" r="17" fill="#000" opacity="0.06"/><circle cx="40" cy="300" r="17" fill="#b4cc9a"/><circle cx="35" cy="295" r="9" fill="#c3d8ab"/><circle cx="963" cy="304" r="17" fill="#000" opacity="0.06"/><circle cx="960" cy="300" r="17" fill="#b4cc9a"/><circle cx="955" cy="295" r="9" fill="#c3d8ab"/><circle cx="283" cy="304" r="14" fill="#000" opacity="0.06"/><circle cx="280" cy="300" r="14" fill="#b4cc9a"/><circle cx="276" cy="296" r="8" fill="#c3d8ab"/><circle cx="723" cy="304" r="14" fill="#000" opacity="0.06"/><circle cx="720" cy="300" r="14" fill="#b4cc9a"/><circle cx="716" cy="296" r="8" fill="#c3d8ab"/><circle cx="423" cy="114" r="17" fill="#000" opacity="0.06"/><circle cx="420" cy="110" r="17" fill="#b4cc9a"/><circle cx="415" cy="105" r="9" fill="#c3d8ab"/><circle cx="583" cy="114" r="17" fill="#000" opacity="0.06"/><circle cx="580" cy="110" r="17" fill="#b4cc9a"/><circle cx="575" cy="105" r="9" fill="#c3d8ab"/><circle cx="423" cy="494" r="17" fill="#000" opacity="0.06"/><circle cx="420" cy="490" r="17" fill="#b4cc9a"/><circle cx="415" cy="485" r="9" fill="#c3d8ab"/><circle cx="583" cy="494" r="17" fill="#000" opacity="0.06"/><circle cx="580" cy="490" r="17" fill="#b4cc9a"/><circle cx="575" cy="485" r="9" fill="#c3d8ab"/><circle cx="28" cy="94" r="17" fill="#000" opacity="0.06"/><circle cx="25" cy="90" r="17" fill="#b4cc9a"/><circle cx="20" cy="85" r="9" fill="#c3d8ab"/><circle cx="978" cy="94" r="17" fill="#000" opacity="0.06"/><circle cx="975" cy="90" r="17" fill="#b4cc9a"/><circle cx="970" cy="85" r="9" fill="#c3d8ab"/><circle cx="28" cy="509" r="17" fill="#000" opacity="0.06"/><circle cx="25" cy="505" r="17" fill="#b4cc9a"/><circle cx="20" cy="500" r="9" fill="#c3d8ab"/><circle cx="978" cy="509" r="17" fill="#000" opacity="0.06"/><circle cx="975" cy="505" r="17" fill="#b4cc9a"/><circle cx="970" cy="500" r="9" fill="#c3d8ab"/><rect x="394" y="195" width="32" height="10" rx="3" fill="#b79a7a" stroke="#8f7a62" stroke-width="1.5"/><rect x="574" y="195" width="32" height="10" rx="3" fill="#b79a7a" stroke="#8f7a62" stroke-width="1.5"/><rect x="394" y="395" width="32" height="10" rx="3" fill="#b79a7a" stroke="#8f7a62" stroke-width="1.5"/><rect x="574" y="395" width="32" height="10" rx="3" fill="#b79a7a" stroke="#8f7a62" stroke-width="1.5"/><circle cx="460" cy="180" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="540" cy="180" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="460" cy="420" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="540" cy="420" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="240" cy="270" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="760" cy="270" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="240" cy="330" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><circle cx="760" cy="330" r="5" fill="#f3e3b3" stroke="#8f8576" stroke-width="1.5" class="lamp"/><rect x="278" y="430" width="3" height="16" rx="1.5" fill="#9a958c"/><rect x="287" y="430" width="3" height="16" rx="1.5" fill="#9a958c"/><rect x="296" y="430" width="3" height="16" rx="1.5" fill="#9a958c"/><rect x="305" y="430" width="3" height="16" rx="1.5" fill="#9a958c"/><rect x="314" y="430" width="3" height="16" rx="1.5" fill="#9a958c"/></svg></div>
+      <div class="sky" id="sky" aria-hidden="true">
+        <div class="sun"></div>
+        <div class="cloud c1"></div>
+        <div class="cloud c2"></div>
+        <div class="cloud c3"></div>
+        <div class="rain"></div>
+        <div class="flash"></div>
+        <div class="night"></div>
+      </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="sandbox" id="sandbox">
+        <div class="actor player-token" id="sam">
+          <span class="dot"></span>
+          <span class="name" data-player-text="Sam">Sam</span>
+        </div>
+      </div>
+    </section>
+    <aside class="chat" aria-label="Campus feed">
+      <h2 class="feed-title">Campus feed</h2>
+      <div class="feed-wrap">
+        <ol class="feed" id="feed" aria-live="polite"></ol>
+        <button class="feed-new" id="feed-new" type="button" hidden>New messages ↓</button>
+      </div>
+    </aside>
+    <div class="dock">
+      <section class="player" aria-label="Player">
+        <h2 class="icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#1c1915" stroke-width="1.6" aria-hidden="true">
+            <circle cx="14" cy="8" r="3.2"></circle>
+            <path d="M7 23c.8-4.2 3.2-6.2 7-6.2S20.2 18.8 21 23"></path>
+          </svg>
+          <span class="who-box">
+            <span id="player-name" data-player-text="Sam">Sam</span>
+            <span class="occupation" id="occupation">Student</span>
+          </span>
+        </h2>
+        <dl class="stats">
+          <div class="stat health"><dt>Health</dt><dd id="health"><span class="bar" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat hunger"><dt>Hunger</dt><dd id="hunger"><span class="bar" role="meter" aria-label="Hunger" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat happiness"><dt>Happiness</dt><dd id="happiness"><span class="bar" role="meter" aria-label="Happiness" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat money"><dt>Money</dt><dd id="money">$100</dd></div>
+          <div class="stat energy"><dt>Energy</dt><dd id="energy"><span class="pips" role="meter" aria-label="Energy" aria-valuemin="0"></span><span class="num"></span></dd></div>
+          <div class="stat burnout" id="burnout-row"><dt>Burnout</dt><dd id="burnout"><span class="bar" role="meter" aria-label="Burnout" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+        </dl>
+        <section class="skills" aria-label="Soft skills">
+          <h3>Soft skills</h3>
+          <dl id="skills"></dl>
+          <div class="interests" id="interests-box" hidden>
+            <h3>Interests</h3>
+            <dl id="interests"></dl>
+          </div>
+        </section>
+      </section>
+      <section class="choices" aria-label="Choices">
+        <h2>Choices</h2>
+        <div class="choice-list" id="roam-choices"></div>
+      </section>
+    </div>
+    <div class="popup" id="popup" hidden>
+      <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="popup-title">
+        <h2 id="popup-title">Paused</h2>
+        <p id="popup-spiel"></p>
+        <p class="popup-memory" id="popup-memory" hidden></p>
+        <div class="choice-list" id="popup-options"></div>
+      </div>
+    </div>
+    <div class="popup" id="end-popup" hidden>
+      <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="end-title">
+        <div id="end-confirm">
+          <h2 id="end-title">End the game early?</h2>
+          <p data-player-text="The day stops here and you see how Sam did.">The day stops here and you see how Sam did.</p>
+          <div class="choice-list">
+            <button id="end-yes" type="button"><strong>End game</strong><span>See the final stats</span></button>
+            <button id="end-no" type="button"><strong>Keep playing</strong><span>Back to the day</span></button>
+          </div>
+        </div>
+        <div id="end-summary" hidden>
+          <h2>Game over</h2>
+          <p id="end-when"></p>
+          <p class="end-style" id="end-style" hidden></p>
+          <div class="tabs" role="tablist" aria-label="Recap">
+            <button type="button" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" data-tab="overview">Overview</button>
+            <button type="button" role="tab" id="tab-highlights" aria-controls="panel-highlights" aria-selected="false" data-tab="highlights" tabindex="-1">Highlights</button>
+            <button type="button" role="tab" id="tab-impact" aria-controls="panel-impact" aria-selected="false" data-tab="impact" tabindex="-1">Impact</button>
+            <button type="button" role="tab" id="tab-decisions" aria-controls="panel-decisions" aria-selected="false" data-tab="decisions" tabindex="-1">Decisions</button>
+            <button type="button" role="tab" id="tab-memories" aria-controls="panel-memories" aria-selected="false" data-tab="memories" tabindex="-1">Memories</button>
+          </div>
+          <div class="tab-panel" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview">
+            <div class="end-layout">
+              <dl class="final-stats" id="final-stats"></dl>
+              <section class="month" aria-labelledby="month-title">
+                <h3 id="month-title" data-player-text="Sam's October">Sam's October</h3>
+                <p class="source" id="month-source">Loading…</p>
+                <div class="month-grid" id="month-grid"></div>
+              </section>
+            </div>
+          </div>
+          <div class="tab-panel" role="tabpanel" id="panel-highlights" aria-labelledby="tab-highlights" hidden>
+            <p class="panel-intro" data-player-text="What Sam's decisions led to.">What Sam's decisions led to.</p>
+            <ol class="highlights" id="recap-highlights"></ol>
+          </div>
+          <div class="tab-panel" role="tabpanel" id="panel-impact" aria-labelledby="tab-impact" hidden>
+            <p class="panel-intro" id="impact-summary"></p>
+            <div class="impact-grid" id="recap-impact"></div>
+          </div>
+          <div class="tab-panel" role="tabpanel" id="panel-decisions" aria-labelledby="tab-decisions" hidden>
+            <div class="decisions" id="recap-decisions"></div>
+          </div>
+          <div class="tab-panel" role="tabpanel" id="panel-memories" aria-labelledby="tab-memories" hidden>
+            <p class="panel-intro" data-player-text="Moments Sam will remember from October.">Moments Sam will remember from October.</p>
+            <ol class="memories" id="recap-memories"></ol>
+          </div>
+          <div class="choice-list">
+            <button id="new-game" type="button"><strong>Start a new game</strong><span>Back to Thursday, October 1</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const roamList = document.querySelector("#roam-choices");
+      let roamButtons = [];
+      let events = {};
+      let skillNames = {};
+      let occupations = {};
+      let strainLimit = 50;
+      let builtDay = null;
+      let sending = false;
+      const health = document.querySelector("#health");
+      const hunger = document.querySelector("#hunger");
+      const happiness = document.querySelector("#happiness");
+      const clock = document.querySelector("#clock");
+      const money = document.querySelector("#money");
+      const energy = document.querySelector("#energy");
+      // The player's first name changes every game; text is written with "Sam" and swapped here.
+      function playerName() {
+        return world?.sam?.name ?? "Sam";
+      }
+      function withPlayer(text) {
+        if (typeof text !== "string") return text;
+        const name = playerName();
+        return name === "Sam" ? text : text.replace(/\bSam\b/g, name);
+      }
+      let shownPlayer = null;
+      function applyPlayerName() {
+        if (shownPlayer === playerName()) return;
+        shownPlayer = playerName();
+        for (const el of document.querySelectorAll("[data-player-text]")) el.textContent = withPlayer(el.dataset.playerText);
+      }
+
+      const feed = document.querySelector("#feed");
+      const FEED_KEY = "college-experience-feed";
+      let feedLog = [];
+      let feedGameId = null;
+      let saveTimer = null;
+      const feedNew = document.querySelector("#feed-new");
+
+      function saveFeed() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try {
+            localStorage.setItem(FEED_KEY, JSON.stringify({ gameId: feedGameId, log: feedLog }));
+          } catch {
+            // Storage can be unavailable (private window). The feed still works for this visit.
+          }
+        }, 250);
+      }
+
+      function loadSavedFeed(gameId) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(FEED_KEY) ?? "null");
+          if (saved && saved.gameId === gameId && Array.isArray(saved.log)) return saved.log;
+        } catch {
+          // Ignore unreadable storage.
+        }
+        return null;
+      }
+
+      function nearBottom() {
+        return feed.scrollHeight - feed.scrollTop - feed.clientHeight < 60;
+      }
+
+      function scrollFeedToEnd() {
+        feed.scrollTop = feed.scrollHeight;
+        feedNew.hidden = true;
+      }
+      feedNew.addEventListener("click", scrollFeedToEnd);
+      feed.addEventListener("scroll", () => {
+        if (nearBottom()) feedNew.hidden = true;
+      });
+
+      function stamp() {
+        if (world === undefined) return "";
+        return `${weekdayText(world.time.day).slice(0, 3)} ${clockText(world.time.hour).replace(":00", "")}`;
+      }
+
+      // Adds an item. Only follows it down if the reader was already at the bottom;
+      // otherwise a "New messages" button appears so reading older posts is not interrupted.
+      function pushFeed(item, entry) {
+        const follow = nearBottom();
+        feed.append(item);
+        if (entry) {
+          feedLog.push(entry);
+          item.feedEntry = entry;
+          saveFeed();
+        }
+        if (follow) scrollFeedToEnd();
+        else feedNew.hidden = false;
+        return item;
+      }
+
+      // A centered pill for things happening in the world. kind: "", "day", "warn" or "world".
+      // A Solana ledger transaction: what moved, with a link to the explorer.
+      function feedChain(text, url, failed = false) {
+        const li = document.createElement("li");
+        li.className = `note chain${failed ? " failed" : ""}`;
+        li.append(`⛓ ${failed ? "Not recorded on Solana yet: " : "On Solana: "}${text}`);
+        if (url) {
+          const link = document.createElement("a");
+          link.href = url;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.textContent = "view";
+          li.append(link);
+        }
+        return pushFeed(li, { k: "chain", text, url, failed });
+      }
+
+      function feedNote(text, kind = "") {
+        const li = document.createElement("li");
+        li.className = `note ${kind}`.trim();
+        text = withPlayer(text);
+        li.textContent = text;
+        return pushFeed(li, { k: "note", text, kind });
+      }
+
+      function feedBubble(side, who, text, detail, extraClass = "", time = stamp(), color = "") {
+        const li = document.createElement("li");
+        li.className = `bubble ${side} ${extraClass}`.trim();
+        const name = document.createElement("span");
+        name.className = "who";
+        name.textContent = who;
+        if (color) name.style.color = color;
+        const when = document.createElement("span");
+        when.className = "when";
+        when.textContent = time;
+        name.append(when);
+        li.append(name, document.createTextNode(text));
+        const entry = { k: "bubble", side, who, text, detail: detail ?? "", cls: extraClass, time, color };
+        if (detail) addBubbleDetail(li, detail, false);
+        return pushFeed(li, entry);
+      }
+
+      function addBubbleDetail(li, detail, save = true) {
+        const small = document.createElement("span");
+        small.className = "detail";
+        small.textContent = detail;
+        li.append(small);
+        if (save && li.feedEntry) {
+          li.feedEntry.detail = detail;
+          saveFeed();
+        }
+      }
+
+      function removeFeedItem(li) {
+        if (li.feedEntry) {
+          feedLog = feedLog.filter((entry) => entry !== li.feedEntry);
+          saveFeed();
+        }
+        li.remove();
+      }
+
+      // Rebuilds the feed from a saved log without animating every old bubble.
+      function restoreFeed(log) {
+        feed.replaceChildren();
+        feedLog = [];
+        for (const entry of log) {
+          const li = entry.k === "note"
+            ? feedNote(entry.text, entry.kind)
+            : entry.k === "chain"
+              ? feedChain(entry.text, entry.url, entry.failed)
+              : feedBubble(entry.side, entry.who, entry.text, entry.detail, entry.cls, entry.time, entry.color ?? "");
+          li.style.animation = "none";
+        }
+        scrollFeedToEnd();
+      }
+
+      function resetFeed(gameId) {
+        feed.replaceChildren();
+        feedLog = [];
+        feedGameId = gameId;
+        saveFeed();
+      }
+
+      function feedTyping(who, extraClass) {
+        const li = document.createElement("li");
+        li.className = `bubble npc ${extraClass}`;
+        li.setAttribute("aria-label", `${who} is typing`);
+        li.innerHTML = '<span class="who"></span><span class="typing"><span></span><span></span><span></span></span>';
+        li.querySelector(".who").textContent = who;
+        return pushFeed(li);
+      }
+
+      function weatherLine(kind) {
+        const weather = weatherNames[kind];
+        if (weather === undefined) return "";
+        if (weather.outdoor?.cancelled) return `${weather.label} today. Outdoor events are cancelled.`;
+        if ((weather.outdoor?.happiness ?? 0) < 0) return `${weather.label} today. Outdoor events will be rough.`;
+        if ((weather.outdoor?.happiness ?? 0) > 0) return `${weather.label} today. Nice day to be outside.`;
+        return `${weather.label} today.`;
+      }
+
+      function feedNewDay(state) {
+        feedNote(`${weekdayText(state.time.day)}, ${dateText(state.time.day)}`, "day");
+        const line = weatherLine(state.weather);
+        if (line) feedNote(line, "world");
+      }
+
+      let world;
+
+      const now = document.querySelector("#now");
+      const dayLabel = document.querySelector("#day");
+      const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      let calendar = { year: 2026, startMonth: 9, startDate: 1, endDay: 31 };
+      const dayDrop = document.querySelector("#day-drop");
+      const dayDropName = document.querySelector("#day-drop-name");
+      const dayDropDate = document.querySelector("#day-drop-date");
+      let shownDay = null;
+      let dropTimer = null;
+
+      function calendarDate(day) {
+        return new Date(calendar.year, calendar.startMonth, calendar.startDate + (day ?? 0));
+      }
+
+      function weekdayText(day) {
+        return DAYS[calendarDate(day).getDay()];
+      }
+
+      function dateText(day) {
+        const date = calendarDate(day);
+        return `${MONTHS[date.getMonth()]} ${date.getDate()}`;
+      }
+
+      function dropDay(day) {
+        dayDropName.textContent = weekdayText(day);
+        dayDropDate.textContent = dateText(day);
+        clearTimeout(dropTimer);
+        dayDrop.classList.remove("show");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => dayDrop.classList.add("show"));
+        });
+        dropTimer = setTimeout(() => dayDrop.classList.remove("show"), 2800);
+      }
+
+      function clockText(hour) {
+        const suffix = hour >= 12 ? "PM" : "AM";
+        const shown = hour % 12 === 0 ? 12 : hour % 12;
+        return `${shown}:00 ${suffix}`;
+      }
+
+      const weatherBox = document.querySelector("#weather");
+      const weatherIcon = document.querySelector("#weather-icon");
+      const weatherLabel = document.querySelector("#weather-label");
+      let weatherNames = {};
+      const SUN = '<circle cx="14" cy="14" r="5" fill="#f2b632" stroke="#1c1915" stroke-width="1.6"/><g stroke="#e0a21a" stroke-width="1.8" stroke-linecap="round"><path d="M14 3v3M14 22v3M3 14h3M22 14h3M6.2 6.2l2.1 2.1M19.7 19.7l2.1 2.1M6.2 21.8l2.1-2.1M19.7 8.3l2.1-2.1"/></g>';
+      const MOON = '<path d="M18.5 4.5a9 9 0 1 0 5 15.5 7.2 7.2 0 0 1-5-15.5z" fill="#f4e7b5" stroke="#1c1915" stroke-width="1.6" stroke-linejoin="round"/>';
+      const CLOUD = (fill) => `<path d="M8 22h13a4.5 4.5 0 0 0 .6-9 6.2 6.2 0 0 0-11.9 1.4A3.8 3.8 0 0 0 8 22z" fill="${fill}" stroke="#1c1915" stroke-width="1.6" stroke-linejoin="round"/>`;
+      const RAIN = '<g stroke="#2f5f8a" stroke-width="1.8" stroke-linecap="round"><path d="M11 24.5l-1 2.5M15.5 24.5l-1 2.5M20 24.5l-1 2.5"/></g>';
+      const BOLT = '<path d="M15.5 21.5l-3 4.5h3l-1.5 4 4.5-6h-3l1.5-2.5z" fill="#f2b632" stroke="#1c1915" stroke-width="1.1" stroke-linejoin="round"/>';
+      function weatherSvg(kind, night) {
+        const sky = night ? MOON : SUN;
+        let inner;
+        if (kind === "sunny") inner = sky;
+        else if (kind === "partlyCloudy") inner = `<g transform="translate(0 0) scale(0.72)">${sky}</g>${CLOUD("#fff")}`;
+        else if (kind === "cloudy") inner = `<g transform="translate(-5 -4)">${CLOUD("#e3ddd2")}</g>${CLOUD("#fff")}`;
+        else if (kind === "rain") inner = `<g transform="translate(0 -3)">${CLOUD("#d9dde3")}</g>${RAIN}`;
+        else inner = `<g transform="translate(0 -4)">${CLOUD("#a9adb8")}</g>${BOLT}`;
+        return `<svg width="28" height="28" viewBox="0 0 28 30" aria-hidden="true">${inner}</svg>`;
+      }
+      function showWeather(kind, hour) {
+        const night = hour < 6 || hour >= 19;
+        let label = weatherNames[kind]?.label ?? "Sunny";
+        if (night && kind === "sunny") label = "Clear";
+        weatherIcon.innerHTML = weatherSvg(kind ?? "sunny", night);
+        weatherLabel.textContent = label;
+        weatherBox.setAttribute("aria-label", `Weather: ${label}`);
+        weatherBox.title = label;
+      }
+
+      function showClock(hour, day) {
+        clock.setAttribute("aria-valuenow", String(hour));
+        clock.setAttribute("aria-valuetext", clockText(hour));
+        dayLabel.textContent = dateText(day);
+        document.querySelector("#weekday").textContent = weekdayText(day);
+        if (shownDay !== null && day > shownDay && day < calendar.endDay) dropDay(day);
+        shownDay = day;
+      }
+
+      function moveNow() {
+        if (world === undefined) return;
+        const fraction = Math.min(1, clockSeconds / 10);
+        now.style.left = `${((world.time.hour + fraction) / 24) * 100}%`;
+        skyNight.style.opacity = String(nightAmount(world.time.hour + fraction));
+      }
+
+      // These mirror world-new.mjs so buttons show the real cost.
+      function currentJob(state = world) {
+        return occupations[state?.sam.occupation] ?? occupations.student ?? { label: "Student" };
+      }
+
+      function isInterestChoice(event) {
+        return Boolean(event.interests || event.hobbyBoost);
+      }
+
+      function isStrained(state = world) {
+        return (state?.sam.burnout ?? 0) >= strainLimit;
+      }
+
+      function hoursFor(event, state = world) {
+        if (event.sleep) return 0;
+        if (event.workShift) return currentJob(state).hours ?? 0;
+        return event.hours ?? 0;
+      }
+
+      function timeText(event) {
+        if (event.sleep) return "until 7 AM";
+        const hours = hoursFor(event);
+        return hours > 0 ? `${hours}h` : "quick";
+      }
+
+      function energyCostFor(event, state = world) {
+        let cost = event.workShift ? currentJob(state).energy ?? 0 : event.energyCost;
+        if (cost > 0 && isStrained(state) && !isInterestChoice(event) && !event.npc) cost += 1;
+        return cost;
+      }
+
+      function fitsOccupation(event, state = world) {
+        // Once-a-month choices disappear after they're used.
+        if (event.once && (state?.log ?? []).some(([, id]) => events[id] === event || id === event.id)) return false;
+        const allowed = event.requires?.occupations;
+        if (allowed && !allowed.includes(state?.sam.occupation ?? "student")) return false;
+        const needs = event.requires?.interest;
+        if (needs) {
+          const [interest, min] = Object.entries(needs)[0];
+          if ((state?.sam.interests?.[interest] ?? 0) < min) return false;
+        }
+        return true;
+      }
+
+      function unlockedPassions(state = world) {
+        return Object.entries(events).filter(([, event]) => event.passion && fitsOccupation(event, state)).map(([id]) => id);
+      }
+
+      function skillGateText(event, state = world) {
+        const gate = event.requires?.anySkill;
+        if (!gate) return null;
+        const ok = Object.entries(gate).some(([skill, min]) => (state?.sam.skills?.[skill] ?? 0) >= min);
+        if (ok) return null;
+        return `Needs ${Object.entries(gate).map(([skill, min]) => `${(skillNames[skill] ?? skill).toLowerCase()} ${min}`).join(" or ")}`;
+      }
+
+      function canAfford(event, state) {
+        return state.sam.energy >= energyCostFor(event, state) && state.sam.money >= event.moneyCost;
+      }
+
+      function costText(event) {
+        const parts = [];
+        if (event.sleep) parts.push("full energy");
+
+        const energyCost = energyCostFor(event);
+        if (energyCost > 0) parts.push(`${energyCost} energy`);
+        if (event.workShift) {
+          const job = currentJob();
+          if (job.pay) parts.push(`earn $${job.pay}`);
+          if (job.burnout) parts.push(`+${job.burnout} burnout`);
+        }
+        if (event.setsOccupation && occupations[event.setsOccupation]) parts.push(`→ ${occupations[event.setsOccupation].label.toLowerCase()}`);
+        if (event.energyGain > 0) parts.push(`+${event.energyGain} energy`);
+        if (event.moneyCost > 0) parts.push(`$${event.moneyCost}`);
+        const earned = event.money?.sam ?? 0;
+        if (earned > 0) parts.push(`earn $${earned}`);
+        const fed = event.hunger?.sam ?? 0;
+        if (fed > 0) parts.push(`+${fed} hunger`);
+        for (const [interest, gain] of Object.entries(event.interests ?? {})) {
+          if (gain > 0) parts.push(`+${gain} ${(interestNames[interest] ?? interest).toLowerCase()}`);
+        }
+        if (event.hobbyBoost) parts.push(`+${event.hobbyBoost} to your top interest`);
+        if (event.burnout) parts.push(`${event.burnout > 0 ? "+" : ""}${event.burnout} burnout`);
+        return parts.length > 0 ? parts.join(", ") : "Free";
+      }
+
+      function todaysWeather() {
+        return weatherNames[world?.weather] ?? { label: "Sunny", outdoor: {} };
+      }
+
+      function weatherNote(event) {
+        if (!event.outdoor) return null;
+        const weather = todaysWeather();
+        const outdoor = weather.outdoor ?? {};
+        if (outdoor.cancelled) return { text: `Cancelled: ${weather.label.toLowerCase()}`, good: false };
+        const bits = [];
+        if (outdoor.happiness) bits.push(`${outdoor.happiness > 0 ? "+" : ""}${outdoor.happiness} happiness`);
+        if (outdoor.health) bits.push(`${outdoor.health > 0 ? "+" : ""}${outdoor.health} health`);
+        if (outdoor.burnout) bits.push(`+${outdoor.burnout} burnout`);
+        if (bits.length === 0) return null;
+        return { text: `${weather.label}: ${bits.join(", ")}`, good: (outdoor.happiness ?? 0) > 0 };
+      }
+
+      function isAvailable(event, day) {
+        const date = calendarDate(day);
+        if (event.weekdaysOnly && (date.getDay() === 0 || date.getDay() === 6)) return false;
+        if (event.when === undefined) return true;
+        const key = `${date.getMonth() + 1}-${date.getDate()}`;
+        return Boolean(event.when.weekdays?.includes(DAYS[date.getDay()]) || event.when.dates?.includes(key));
+      }
+
+      function whenText(event) {
+        if (event.when?.dates) return "Today only";
+        return "";
+      }
+
+      function choicesKey(state) {
+        const usedOnce = (state.log ?? []).filter(([, id]) => events[id]?.once).length;
+        return `${state.time.day}|${state.sam.occupation}|${isStrained(state)}|${unlockedPassions(state).join(",")}|${usedOnce}`;
+      }
+
+      // Tells the player when growing an interest unlocks a new passion choice.
+      let knownPassions = null;
+      function announcePassions(state) {
+        const now = unlockedPassions(state);
+        if (knownPassions !== null) {
+          for (const id of now) {
+            if (knownPassions.includes(id)) continue;
+            const event = events[id];
+            const interest = interestNames[event.passion] ?? event.passion;
+            feedNote(`New choice unlocked: ${event.title}. ${interest} keeps growing.`, "day");
+            showToast(`Unlocked: ${event.title}`, `${interest} reached ${Object.values(event.requires.interest)[0]}`);
+          }
+        }
+        knownPassions = now;
+      }
+
+      function buildRoamChoices() {
+        const day = world?.time.day ?? 0;
+        builtDay = world ? choicesKey(world) : null;
+        roamButtons = Object.entries(events)
+          .filter(([, event]) => event.roam && isAvailable(event, day) && fitsOccupation(event))
+          .map(([id, event]) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            const title = document.createElement("strong");
+            const cost = document.createElement("span");
+            title.textContent = event.title;
+            const time = document.createElement("span");
+            time.className = "time-tag";
+            time.textContent = timeText(event);
+            title.append(" ", time);
+            const tag = whenText(event);
+            if (tag !== "") {
+              const badge = document.createElement("span");
+              badge.className = "event-tag";
+              badge.textContent = tag;
+              cost.append(badge);
+            }
+            cost.append(costText(event));
+            const gate = skillGateText(event);
+            if (gate) {
+              const gateEl = document.createElement("span");
+              gateEl.className = "weather-note bad";
+              gateEl.textContent = gate;
+              cost.append(gateEl);
+            }
+            // Green: something Sam enjoys (interests). Red: ordinary work that wears on Sam while burning out.
+            if (isInterestChoice(event)) {
+              cost.classList.add("likes");
+              cost.title = withPlayer(isStrained() ? "Something Sam enjoys. Helps more with burnout right now." : "Something Sam enjoys.");
+            } else if (isStrained() && !event.npc && !event.sleep && id !== "nap" && energyCostFor(event) > 0) {
+              cost.classList.add("dislikes");
+              cost.title = withPlayer("Sam is burning out: this costs 1 more energy and 1 happiness.");
+            }
+            const note = weatherNote(event);
+            if (note !== null) {
+              const noteEl = document.createElement("span");
+              noteEl.className = `weather-note ${note.good ? "good" : "bad"}`;
+              noteEl.textContent = note.text;
+              cost.append(noteEl);
+            }
+            const done = document.createElement("span");
+            done.className = "event-done";
+            done.textContent = "Done today";
+            done.hidden = true;
+            button.append(title, cost, done);
+            button.addEventListener("click", () => choose(id));
+            return { id, event, button };
+          });
+        const groups = new Map();
+        for (const item of roamButtons) {
+          const name = item.event.group ?? "Around campus";
+          if (!groups.has(name)) groups.set(name, []);
+          groups.get(name).push(item.button);
+        }
+        const nodes = [];
+        const ORDER = ["Today's events", "Passions", "Around campus", "Work", "Personal"];
+        const rank = (name) => (ORDER.includes(name) ? ORDER.indexOf(name) : ORDER.length);
+        const ordered = [...groups].sort(([a], [b]) => rank(a) - rank(b));
+        for (const [name, buttons] of ordered) {
+          const heading = document.createElement("h3");
+          heading.className = "choice-group";
+          heading.textContent = name;
+          nodes.push(heading, ...buttons);
+        }
+        roamList.replaceChildren(...nodes);
+      }
+
+      function refreshRoamChoices() {
+        for (const { id, event, button } of roamButtons) {
+          const doneToday = event.when !== undefined && (world?.doneToday ?? []).includes(id);
+          const doneNote = button.querySelector(".event-done");
+          if (doneNote) doneNote.hidden = !doneToday;
+          const rainedOut = event.outdoor === true && todaysWeather().outdoor?.cancelled === true;
+          const gated = skillGateText(event) !== null;
+          button.disabled = gated || rainedOut || doneToday || sending || userPaused || world === undefined || world.over === true || !canAfford(event, world);
+        }
+      }
+
+      const skillsList = document.querySelector("#skills");
+      const interestsBox = document.querySelector("#interests-box");
+      const interestsList = document.querySelector("#interests");
+      let interestNames = {};
+      let lastInterests = null;
+
+      function proficiency(value) {
+        if (value >= 75) return "Expert";
+        if (value >= 50) return "Skilled";
+        if (value >= 25) return "Developing";
+        return "Beginner";
+      }
+
+      function showInterests(interests) {
+        const entries = Object.entries(interests).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
+        interestsBox.hidden = entries.length === 0;
+        interestsList.replaceChildren(
+          ...entries.map(([id, raw]) => {
+            const value = Math.max(0, Math.min(100, raw));
+            const label = interestNames[id] ?? id;
+            const row = document.createElement("div");
+            row.className = "skill interest";
+            if (lastInterests !== null && value > (lastInterests[id] ?? 0)) row.classList.add("bump");
+            const dt = document.createElement("dt");
+            const name = document.createElement("span");
+            const level = document.createElement("small");
+            const num = document.createElement("span");
+            name.textContent = label;
+            level.textContent = proficiency(value);
+            num.textContent = String(value);
+            dt.append(name, num);
+            const dd = document.createElement("dd");
+            dd.innerHTML = '<span class="bar" role="meter" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span>';
+            dd.querySelector(".bar").setAttribute("aria-label", `${label} proficiency`);
+            dd.querySelector(".bar").setAttribute("aria-valuenow", String(value));
+            dd.querySelector(".fill").style.width = `${value}%`;
+            dd.append(level);
+            row.append(dt, dd);
+            return row;
+          }),
+        );
+        lastInterests = { ...interests };
+      }
+
+      let lastSkills = null;
+      function showSkills(skills) {
+        const rows = Object.entries(skillNames).map(([id, label]) => {
+          const value = Math.max(0, Math.min(100, skills[id] ?? 0));
+          const row = document.createElement("div");
+          row.className = "skill";
+          if (lastSkills !== null && value > (lastSkills[id] ?? 0)) row.classList.add("bump");
+          const dt = document.createElement("dt");
+          const name = document.createElement("span");
+          const num = document.createElement("span");
+          name.textContent = label;
+          num.textContent = String(value);
+          dt.append(name, num);
+          const dd = document.createElement("dd");
+          dd.innerHTML = '<span class="bar" role="meter" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span>';
+          dd.querySelector(".bar").setAttribute("aria-label", label);
+          dd.querySelector(".bar").setAttribute("aria-valuenow", String(value));
+          dd.querySelector(".fill").style.width = `${value}%`;
+          row.append(dt, dd);
+          return row;
+        });
+        skillsList.replaceChildren(...rows);
+        lastSkills = { ...skills };
+      }
+
+      function showBar(el, value) {
+        const shown = Math.max(0, Math.min(100, value));
+        el.querySelector(".fill").style.width = `${shown}%`;
+        el.querySelector(".bar").setAttribute("aria-valuenow", String(shown));
+        el.querySelector(".num").textContent = `${shown}/100`;
+      }
+
+      function showEnergy(value, max) {
+        const pips = energy.querySelector(".pips");
+        if (pips.children.length !== max) {
+          pips.replaceChildren(
+            ...Array.from({ length: max }, () => {
+              const pip = document.createElement("span");
+              pip.className = "pip";
+              return pip;
+            }),
+          );
+        }
+        [...pips.children].forEach((pip, i) => pip.classList.toggle("on", i < value));
+        pips.setAttribute("aria-valuemax", String(max));
+        pips.setAttribute("aria-valuenow", String(value));
+        energy.querySelector(".num").textContent = `${value}/${max}`;
+      }
+
+      const burnoutEl = document.querySelector("#burnout");
+      const burnoutRow = document.querySelector("#burnout-row");
+      let burnoutLimit = 70;
+      const sky = document.querySelector("#sky");
+      const skyNight = sky.querySelector(".night");
+      const toast = document.querySelector("#toast");
+      let toastTimer = null;
+      let lastWeather = null;
+
+      function floatDelta(el, delta, text) {
+        if (delta === 0 || el === null) return;
+        const floater = document.createElement("span");
+        floater.className = `floater ${delta > 0 ? "up" : "down"}`;
+        floater.textContent = text ?? `${delta > 0 ? "+" : ""}${delta}`;
+        el.append(floater);
+        floater.addEventListener("animationend", () => floater.remove());
+      }
+
+      // Animates what a choice changed and returns a short list of the changes.
+      function showDeltas(before, after) {
+        const changes = [];
+        const rows = [
+          ["health", health, "health"],
+          ["hunger", hunger, "hunger"],
+          ["happiness", happiness, "happiness"],
+          ["burnout", burnoutEl, "burnout"],
+        ];
+        for (const [key, el, label] of rows) {
+          const delta = (after[key] ?? 0) - (before[key] ?? 0);
+          floatDelta(el, delta);
+          if (delta !== 0) changes.push(`${delta > 0 ? "+" : ""}${delta} ${label}`);
+        }
+        const moneyDelta = after.money - before.money;
+        floatDelta(money, moneyDelta, `${moneyDelta > 0 ? "+" : "-"}$${Math.abs(moneyDelta)}`);
+        if (moneyDelta !== 0) changes.push(`${moneyDelta > 0 ? "+" : "-"}$${Math.abs(moneyDelta)}`);
+        const energyDelta = after.energy - before.energy;
+        floatDelta(energy, energyDelta);
+        if (energyDelta !== 0) changes.push(`${energyDelta > 0 ? "+" : ""}${energyDelta} energy`);
+        return changes;
+      }
+
+      function showToast(title, detail) {
+        title = withPlayer(title);
+        detail = withPlayer(detail);
+        toast.replaceChildren();
+        const strong = document.createElement("strong");
+        strong.textContent = title;
+        toast.append(strong);
+        if (detail) {
+          const span = document.createElement("span");
+          span.textContent = detail;
+          toast.append(span);
+        }
+        clearTimeout(toastTimer);
+        toast.classList.add("show");
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+      }
+
+      function nightAmount(hourFloat) {
+        // 0 in daylight, up to 0.45 in the middle of the night, with dusk and dawn fades.
+        const h = ((hourFloat % 24) + 24) % 24;
+        if (h >= 7 && h < 18) return 0;
+        if (h >= 18 && h < 21) return ((h - 18) / 3) * 0.45;
+        if (h >= 5 && h < 7) return ((7 - h) / 2) * 0.45;
+        return 0.45;
+      }
+
+      function showSky(kind, hourFloat) {
+        const night = nightAmount(hourFloat);
+        sky.className = `sky ${kind ?? "sunny"}${night > 0.2 ? " night-on" : ""}`;
+        document.querySelector(".game").classList.toggle("night-time", night > 0.2);
+        skyNight.style.opacity = String(night);
+      }
+
+      function showBurnout(value) {
+        showBar(burnoutEl, value);
+        const high = value >= burnoutLimit;
+        burnoutRow.classList.toggle("high", high);
+        burnoutRow.classList.toggle("strained", value >= strainLimit && !high);
+        burnoutRow.title = withPlayer(high
+          ? "Burnt out: every choice costs extra happiness and health, and ordinary tasks cost +1 energy. Do things Sam enjoys, eat, rest or sleep."
+          : value >= strainLimit
+            ? "Burning out: ordinary tasks cost +1 energy and 1 happiness. Things Sam enjoys still help."
+            : "Burnout rises when Sam is low on energy, happiness or food, and eases when Sam is doing well.");
+      }
+
+      function showStats(state) {
+        if (lastWeather !== null && state.weather !== lastWeather) {
+          weatherBox.classList.remove("changed");
+          void weatherBox.offsetWidth;
+          weatherBox.classList.add("changed");
+        }
+        lastWeather = state.weather;
+        const previous = world;
+        world = state;
+        if (previous !== undefined && state.time.day > previous.time.day && !state.over) feedNewDay(state);
+        if (previous !== undefined) {
+          const wasHigh = (previous.sam.burnout ?? 0) >= burnoutLimit;
+          const isHigh = (state.sam.burnout ?? 0) >= burnoutLimit;
+          if (!wasHigh && isHigh) feedNote("Sam is burnt out. Every choice now costs extra happiness and health.", "warn");
+          if (wasHigh && !isHigh) feedNote("Sam isn't burnt out anymore.", "world");
+          const wasStrained = (previous.sam.burnout ?? 0) >= strainLimit;
+          const strained = (state.sam.burnout ?? 0) >= strainLimit;
+          if (!wasStrained && strained) feedNote("Sam is starting to burn out. Ordinary tasks now take more out of Sam; things Sam enjoys still help.", "warn");
+          if (wasStrained && !strained) feedNote("Sam's burnout is easing.", "world");
+          if (previous.sam.occupation !== state.sam.occupation) {
+            const job = currentJob(state);
+            feedNote(state.sam.occupation === "student" ? "Sam is back to being just a student." : `New job: ${job.detail}.`, "world");
+          }
+          if (previous.sam.energy > 0 && state.sam.energy === 0) feedNote("Sam is out of energy.", "warn");
+        }
+        applyPlayerName();
+        showBar(health, state.sam.health);
+        showBar(hunger, state.sam.hunger);
+        showBar(happiness, state.sam.happiness);
+        showClock(state.time.hour, state.time.day);
+        showWeather(state.weather, state.time.hour);
+        passHours(state.time.hour);
+        money.textContent = `$${state.sam.money}`;
+        showEnergy(state.sam.energy, state.sam.energyMax);
+        showBurnout(state.sam.burnout ?? 0);
+        showSky(state.weather, state.time.hour);
+        showSkills(state.sam.skills ?? {});
+        showInterests(state.sam.interests ?? {});
+        if (Object.keys(events).length > 0) announcePassions(state);
+        if (builtDay !== choicesKey(state) && Object.keys(events).length > 0) buildRoamChoices();
+        const job = currentJob(state);
+        const occupationEl = document.querySelector("#occupation");
+        occupationEl.textContent = state.sam.occupation === "student" || !job.detail ? "Student" : `Student · ${job.detail}`;
+        occupationEl.title = job.detail ?? "";
+        refreshRoamChoices();
+        if (state.over && !gameOverShown) showGameOver(`Sam made it to ${dateText(state.time.day)}. October is over.`);
+      }
+
+      async function choose(eventId) {
+        const fromEncounter = encounterId !== null;
+        const npcId = encounterId;
+        // The person fades away right away instead of waiting for the reply.
+        if (fromEncounter) finishMeeting();
+        sending = true;
+        refreshRoamChoices();
+        setPopupDisabled(true);
+        const event = events[eventId];
+        const before = world?.sam;
+        const samBubble = event ? feedBubble("sam", playerName(), event.title, "") : null;
+        // Sam's own choices don't get a reply; only conversations with Captain, Spark or Sage do.
+        const quiet = event?.quiet === true || !event?.npc;
+        const coach = meetings.captain?.name ?? "Captain";
+        let typing = quiet ? null : feedTyping(coach, "captain");
+        try {
+          const response = await fetch("/choices", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ playerId: "sam", eventId }),
+          });
+          const result = await response.json();
+          if (response.status === 400) {
+            if (samBubble) removeFeedItem(samBubble);
+            feedNote(result.error ?? "That choice didn't work.", "warn");
+            showToast("Can't do that", result.error ?? "");
+            if (result.state) showStats(result.state);
+          } else {
+            if (result.state) {
+              const changes = before ? showDeltas(before, result.state.sam) : [];
+              if (event) {
+                if (samBubble && changes.length > 0) addBubbleDetail(samBubble, changes.join(", "));
+                showToast(event.title, changes.join(", "));
+              }
+              showStats(result.state);
+            }
+            typing?.remove();
+            typing = null;
+            const spark = result.state?.lastInspiration;
+            if (spark && spark.at === (result.state.log ?? []).length) {
+              const who = meetings[spark.npc]?.name ?? "Someone";
+              const what = (interestNames[spark.interest] ?? spark.interest).toLowerCase();
+              feedNote(spark.isNew ? `${who} got Sam curious about ${what} (+${spark.amount}).` : `${who} inspired Sam to keep at ${what} (+${spark.amount}).`, "world");
+            }
+            if (quiet) {
+              npcResponds(npcId ?? event?.npc, event?.action);
+            } else if (result.ok && result.reply) {
+              feedBubble("npc", coach, shortReply(result.reply), "", "", stamp(), meetings.captain?.color ?? "");
+            } else if (result.ok) {
+              feedNote(`${coach} read it but didn't reply.`, "world");
+            } else {
+              feedNote(result.error ?? `${coach} couldn't answer (agent returned ${result.agentStatus}).`, "warn");
+            }
+          }
+        } catch {
+          feedNote("The page could not reach its own server.", "warn");
+        } finally {
+          typing?.remove();
+          sending = false;
+          refreshRoamChoices();
+          setPopupDisabled(false);
+        }
+      }
+
+
+      const REACH = 72;
+      const RELEASE = 112;
+      const sandbox = document.querySelector("#sandbox");
+      const popup = document.querySelector("#popup");
+      const popupTitle = document.querySelector("#popup-title");
+      const popupSpiel = document.querySelector("#popup-spiel");
+      const popupOptions = document.querySelector("#popup-options");
+      const player = { el: document.querySelector("#sam"), x: 0, y: 0, speed: 140, moving: false };
+      const popupMemory = document.querySelector("#popup-memory");
+      let residents = [];
+      let meetings = {};
+
+      // Keeps agent replies as short as everyone else's lines: the first one or two sentences, about 160 characters.
+      function shortReply(text) {
+        const clean = String(text).replace(/\s+/g, " ").trim();
+        const sentences = clean.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) ?? [clean];
+        let out = sentences[0].trim();
+        if (sentences[1] && out.length + sentences[1].length <= 160) out += " " + sentences[1].trim();
+        if (out.length > 180) out = out.slice(0, 177).replace(/\s+\S*$/, "") + "…";
+        return out;
+      }
+
+      // A classmate's canned reaction: a speech bubble for talk/busy, a note for being ignored.
+      function npcResponds(id, action) {
+        const meeting = meetings[id];
+        const options = meeting?.lines?.[action] ?? (action === "hangout" ? meeting?.lines?.talk : null);
+        if (!meeting || !Array.isArray(options) || options.length === 0) return;
+        const line = options[Math.floor(Math.random() * options.length)];
+        if (action === "ignore") {
+          feedNote(line, "warn");
+        } else {
+          feedBubble("npc", meeting.name, line, "", "", stamp(), meeting.color);
+        }
+      }
+
+      // Solana: show each ledger transaction in the feed (only when the server has it set up).
+      let solanaOn = false;
+      let chainSeen = 0;
+      // Polls even when Solana looked off at first, so it picks up once the server has loaded it.
+      async function pollChain() {
+        try {
+          const result = await (await fetch(`/chain?after=${chainSeen}`)).json();
+          solanaOn = result.enabled === true;
+          if (!solanaOn) return;
+          for (const entry of result.entries ?? []) {
+            chainSeen = Math.max(chainSeen, entry.id);
+            if (entry.signature) feedChain(entry.text, entry.url);
+            else feedChain(entry.text, "", true);
+          }
+        } catch {
+          // The next poll will try again.
+        }
+      }
+      setInterval(pollChain, 5000);
+
+      function setPopupDisabled(disabled) {
+        for (const button of popupOptions.querySelectorAll("button")) button.disabled = disabled;
+      }
+      let encounterId = null;
+      const cooled = new Set();
+      const AWAY_HOURS = 3;
+      const EDGE = 26;
+      // People stay below the date and weather at the top of the map.
+      const TOP = 104;
+      let lastHour = null;
+
+      // Each person is "off" (not on campus), "entering" (walking in from an edge), "roam",
+      // "exiting" (walking out of the map) or "away" (just talked to Sam; off for a few hours).
+      function makeResident(id, meeting) {
+        const el = document.createElement("div");
+        el.className = "actor npc";
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = meeting.color ?? "#888";
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = meeting.name;
+        el.append(dot, name);
+        el.hidden = true;
+        sandbox.append(el);
+        return { id, name: meeting.name, color: meeting.color, el, x: -100, y: -100, angle: 0, speed: 16 + Math.random() * 20, pause: 0, mode: "off", awayHours: 0 };
+      }
+
+      function buildResidents() {
+        for (const resident of residents) resident.el.remove();
+        residents = Object.entries(meetings).map(([id, meeting]) => makeResident(id, meeting));
+      }
+
+      function onCampus(resident) {
+        return resident.mode === "roam" || resident.mode === "entering";
+      }
+
+      function pick(list) {
+        return list[Math.floor(Math.random() * list.length)];
+      }
+
+      // How many people are around at this hour, out of everyone.
+      function targetPopulation(hourFloat) {
+        const h = ((hourFloat % 24) + 24) % 24;
+        let share;
+        if (h < 5) share = 0.1;
+        else if (h < 7) share = 0.25;
+        else if (h < 9) share = 0.6;
+        else if (h < 17) share = 1;
+        else if (h < 20) share = 0.7;
+        else if (h < 22) share = 0.4;
+        else share = 0.2;
+        return Math.min(residents.length, Math.max(1, Math.round(residents.length * share)));
+      }
+
+      function show(resident) {
+        clearTimeout(resident.fadeTimer);
+        resident.el.classList.remove("leaving");
+        resident.el.hidden = false;
+        resident.el.classList.remove("arriving");
+        void resident.el.offsetWidth;
+        resident.el.classList.add("arriving");
+        cooled.delete(resident.id);
+      }
+
+      // Puts someone somewhere on the map right away (used when the page loads).
+      function placeInside(resident) {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        const margin = 36;
+        let x;
+        let y;
+        let tries = 0;
+        do {
+          x = margin + Math.random() * (width - margin * 2);
+          y = TOP + Math.random() * (height - TOP - margin);
+          tries += 1;
+        } while (Math.hypot(x - player.x, y - player.y) < RELEASE && tries < 30);
+        resident.x = x;
+        resident.y = y;
+        resident.angle = Math.random() * Math.PI * 2;
+        resident.pause = Math.random();
+        resident.mode = "roam";
+        show(resident);
+      }
+
+      // Walks someone in from the left, right or bottom edge.
+      function walkIn(resident) {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        const side = pick(["left", "right", "bottom", "left", "right"]);
+        if (side === "left") { resident.x = -EDGE; resident.y = TOP + Math.random() * (height - TOP - 40); }
+        if (side === "right") { resident.x = width + EDGE; resident.y = TOP + Math.random() * (height - TOP - 40); }
+        if (side === "bottom") { resident.x = 40 + Math.random() * (width - 80); resident.y = height + EDGE; }
+        const tx = width * (0.25 + Math.random() * 0.5);
+        const ty = height * (0.35 + Math.random() * 0.4);
+        resident.angle = Math.atan2(ty - resident.y, tx - resident.x);
+        resident.pause = 0;
+        resident.mode = "entering";
+        show(resident);
+      }
+
+      // Sends someone off the nearest edge of the map; they disappear once they are out.
+      function walkOut(resident) {
+        if (resident.chatWith) endChat(resident);
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        const exits = [
+          { d: resident.x, angle: Math.PI },
+          { d: width - resident.x, angle: 0 },
+          { d: height - resident.y, angle: Math.PI / 2 },
+        ];
+        exits.sort((a, b) => a.d - b.d);
+        resident.angle = exits[0].angle + (Math.random() - 0.5) * 0.5;
+        resident.pause = 0;
+        resident.mode = "exiting";
+      }
+
+      // Small talk between people who bump into each other: [opener, reply].
+      // When two people meet they each show a small emoji: [first person, second person].
+      const SMALL_TALK = [
+        ["👋", "😄"],
+        ["☕", "👍"],
+        ["📚", "😩"],
+        ["🎉", "🙌"],
+        ["🍕", "😋"],
+        ["😴", "😅"],
+        ["🎧", "🔥"],
+        ["🏀", "💪"],
+        ["❓", "🤷"],
+        ["💡", "✨"],
+      ];
+      const WEATHER_TALK = {
+        rain: ["☔", "💧"],
+        storm: ["⚡", "😱"],
+        sunny: ["😎", "☀️"],
+      };
+      // After a chat each person either carries on or fades out of the game for a while.
+      const FADE_AFTER_CHAT = 0.3;
+      const CHAT_RANGE = 34;
+      let lastChatNoteHour = -99;
+
+      function say(resident, text, seconds, side = "") {
+        resident.sayEl?.remove();
+        const bubble = document.createElement("span");
+        bubble.className = side ? `say emoji ${side}` : "say emoji";
+        bubble.textContent = text;
+        resident.el.append(bubble);
+        resident.sayEl = bubble;
+        clearTimeout(resident.sayTimer);
+        resident.sayTimer = setTimeout(() => {
+          bubble.remove();
+          if (resident.sayEl === bubble) resident.sayEl = null;
+        }, seconds * 1000);
+      }
+
+      // Quietly leaves the game: fades out where they stand and can walk back in later.
+      function fadeOut(resident) {
+        resident.mode = "off";
+        resident.sayEl?.remove();
+        resident.el.classList.remove("arriving", "walking");
+        resident.el.classList.add("leaving");
+        clearTimeout(resident.fadeTimer);
+        resident.fadeTimer = setTimeout(() => {
+          if (!onCampus(resident)) resident.el.hidden = true;
+        }, 900);
+      }
+
+      // natural: the chat ran its course (not cut short by Sam or someone leaving).
+      function endChat(resident, natural = false) {
+        const partner = resident.chatWith;
+        for (const person of [resident, partner]) {
+          if (!person) continue;
+          person.chatWith = null;
+          person.chatLeft = 0;
+          person.chatCooldown = 15 + Math.random() * 15;
+          person.el.classList.remove("chatting");
+          person.pause = 0;
+        }
+        if (partner) {
+          // Walk off in different directions.
+          const away = Math.atan2(resident.y - partner.y, resident.x - partner.x);
+          resident.angle = away + (Math.random() - 0.5) * 0.6;
+          partner.angle = away + Math.PI + (Math.random() - 0.5) * 0.6;
+        }
+        if (natural) {
+          for (const person of [resident, partner]) {
+            if (person && person.mode === "roam" && Math.random() < FADE_AFTER_CHAT) fadeOut(person);
+          }
+        }
+      }
+
+      function startChat(a, b) {
+        const seconds = 2.5 + Math.random() * 1.5;
+        fetch("/chats", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ a: a.id, b: b.id }),
+        })
+          .then((response) => response.json())
+          .then((result) => {
+            if (result.state && !sending) world = result.state;
+          })
+          .catch(() => {});
+        // Stand side by side so both bubbles fit.
+        const [left, right] = a.x <= b.x ? [a, b] : [b, a];
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        left.x = midX - 18;
+        right.x = midX + 18;
+        left.y = midY;
+        right.y = midY;
+        const lines = Math.random() < 0.35 && WEATHER_TALK[world?.weather] ? WEATHER_TALK[world.weather] : pick(SMALL_TALK);
+        for (const [person, partner] of [[a, b], [b, a]]) {
+          person.chatWith = partner;
+          person.chatLeft = seconds;
+          person.pause = 0;
+          person.el.classList.add("chatting");
+        }
+        const sideOf = (person) => (person === left ? "to-left" : "to-right");
+        say(a, lines[0], seconds, sideOf(a));
+        b.replyTimer = setTimeout(() => {
+          if (b.chatWith === a) say(b, lines[1], Math.max(1, seconds - 0.6), sideOf(b));
+        }, 600);
+        // Mention it in the feed now and then, not every time.
+        const hour = (world?.time.day ?? 0) * 24 + (world?.time.hour ?? 0);
+        if (hour - lastChatNoteHour >= 2) {
+          lastChatNoteHour = hour;
+          feedNote(`${a.name} and ${b.name} stopped to chat.`);
+        }
+      }
+
+      // People who meet stop for a few seconds, trade a line each, then go their own ways.
+      function stepChats(dt) {
+        const free = [];
+        for (const resident of residents) {
+          if (resident.chatCooldown > 0) resident.chatCooldown -= dt;
+          if (resident.chatWith) {
+            resident.chatLeft -= dt;
+            if (resident.mode !== "roam" || resident.chatWith.mode !== "roam") endChat(resident);
+            else if (resident.chatLeft <= 0) endChat(resident, true);
+            continue;
+          }
+          if (resident.mode === "roam" && !(resident.chatCooldown > 0) && resident.id !== encounterId) free.push(resident);
+        }
+        for (let i = 0; i < free.length; i += 1) {
+          for (let j = i + 1; j < free.length; j += 1) {
+            const a = free[i];
+            const b = free[j];
+            if (a.chatWith || b.chatWith) continue;
+            if (Math.hypot(a.x - b.x, a.y - b.y) <= CHAT_RANGE) startChat(a, b);
+          }
+        }
+      }
+
+      let crowdSeconds = 0;
+      function manageCrowd(dt) {
+        crowdSeconds += dt;
+        if (crowdSeconds < 1.5 || world === undefined) return;
+        crowdSeconds = 0;
+        const target = targetPopulation(world.time.hour + Math.min(1, clockSeconds / 10));
+        const present = residents.filter(onCampus);
+        const roaming = residents.filter((item) => item.mode === "roam" && item.id !== encounterId);
+        const offstage = residents.filter((item) => item.mode === "off");
+        if (present.length < target && offstage.length > 0) {
+          if (Math.random() < 0.6) walkIn(pick(offstage));
+        } else if (present.length > target && roaming.length > 0) {
+          walkOut(pick(roaming));
+        } else if (Math.random() < 0.06 && roaming.length > 0 && offstage.length > 0) {
+          walkOut(pick(roaming));
+        }
+      }
+
+      function populateNow() {
+        for (const resident of residents) {
+          resident.mode = "off";
+          resident.el.hidden = true;
+          resident.el.classList.remove("leaving", "arriving", "walking");
+        }
+        if (world === undefined) return;
+        const target = targetPopulation(world.time.hour);
+        const order = [...residents].sort(() => Math.random() - 0.5);
+        for (const resident of order.slice(0, target)) placeInside(resident);
+      }
+
+      function passHours(hour) {
+        if (lastHour !== null && hour !== lastHour) {
+          const passed = (hour - lastHour + 24) % 24;
+          for (const resident of residents) {
+            if (resident.mode !== "away") continue;
+            resident.awayHours -= passed;
+            if (resident.awayHours <= 0) resident.mode = "off";
+          }
+        }
+        lastHour = hour;
+      }
+
+      // Ignores are saved in the game state (relations) and sent to the agents. On screen the
+      // memory only shows through the person's description: their greeting turns colder each time.
+      function spielFor(id, meeting) {
+        const count = world?.relations?.[id]?.ignore ?? 0;
+        if (count === 0 || !Array.isArray(meeting.grudge) || meeting.grudge.length === 0) return meeting.spiel;
+        return meeting.grudge[Math.min(count, meeting.grudge.length) - 1];
+      }
+
+      function startEncounter(id) {
+        const meeting = meetings[id];
+        if (meeting === undefined) return;
+        encounterId = id;
+        held.clear();
+        player.moving = false;
+        popupTitle.textContent = meeting.name;
+        const spiel = spielFor(id, meeting);
+        popupSpiel.textContent = spiel;
+        popupMemory.hidden = true;
+        feedNote(spiel, "world");
+        const buttons = meeting.options.map((option, index) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          const label = document.createElement("strong");
+          const hint = document.createElement("span");
+          label.textContent = `${index + 1}. ${option.label}`;
+          hint.textContent = option.hint;
+          button.setAttribute("aria-keyshortcuts", String(index + 1));
+          button.append(label, hint);
+          const optionEvent = events[option.eventId];
+          button.disabled = sending || (optionEvent !== undefined && world !== undefined && !canAfford(optionEvent, world));
+          button.addEventListener("click", () => {
+            if (encounterId === null) return;
+            choose(option.eventId);
+          });
+          return button;
+        });
+        popupOptions.replaceChildren(...buttons);
+        popup.hidden = false;
+      }
+
+      // Any interaction (talk, busy or ignore) sends the person away for a few hours.
+      function finishMeeting() {
+        const resident = residents.find((item) => item.id === encounterId);
+        if (resident !== undefined) {
+          if (resident.chatWith) endChat(resident);
+          resident.sayEl?.remove();
+          resident.mode = "away";
+          resident.awayHours = AWAY_HOURS;
+          resident.el.classList.remove("arriving", "walking");
+          resident.el.classList.add("leaving");
+          clearTimeout(resident.fadeTimer);
+          resident.fadeTimer = setTimeout(() => {
+            if (!onCampus(resident)) resident.el.hidden = true;
+          }, 900);
+        }
+        encounterId = null;
+        popup.hidden = true;
+      }
+
+      // Sam has to walk into someone to start a conversation; people passing a standing Sam leave them be.
+      function checkProximity() {
+        let closest = null;
+        for (const resident of residents) {
+          if (resident.mode !== "roam") continue;
+          const dist = Math.hypot(player.x - resident.x, player.y - resident.y);
+          if (dist > RELEASE) cooled.delete(resident.id);
+          if (player.moving && dist <= REACH && !cooled.has(resident.id) && (closest === null || dist < closest.dist)) {
+            closest = { id: resident.id, dist };
+          }
+        }
+        if (closest !== null) startEncounter(closest.id);
+      }
+
+      const held = new Set();
+      const keyDir = {
+        arrowup: [0, -1],
+        w: [0, -1],
+        arrowdown: [0, 1],
+        s: [0, 1],
+        arrowleft: [-1, 0],
+        a: [-1, 0],
+        arrowright: [1, 0],
+        d: [1, 0],
+      };
+
+      function placeResidents() {
+        player.x = sandbox.clientWidth * 0.5;
+        player.y = sandbox.clientHeight * 0.55;
+      }
+
+      function stepPlayer(dt, width, height) {
+        let dx = 0;
+        let dy = 0;
+        for (const name of held) {
+          const dir = keyDir[name];
+          if (dir === undefined) continue;
+          dx += dir[0];
+          dy += dir[1];
+        }
+        if (dx !== 0 || dy !== 0) {
+          const length = Math.hypot(dx, dy);
+          player.x += (dx / length) * player.speed * dt;
+          player.y += (dy / length) * player.speed * dt;
+        }
+        const margin = 36;
+        player.x = Math.max(margin, Math.min(width - margin, player.x));
+        player.y = Math.max(margin, Math.min(height - margin, player.y));
+        player.el.style.left = `${player.x}px`;
+        player.el.style.top = `${player.y}px`;
+        player.moving = dx !== 0 || dy !== 0;
+        player.el.classList.toggle("walking", player.moving);
+      }
+
+      function stepResident(resident, dt, width, height) {
+        if (!onCampus(resident) && resident.mode !== "exiting") return;
+        const margin = 36;
+        if (resident.mode === "roam" && resident.chatWith) {
+          // Standing and talking.
+        } else if (resident.mode === "roam" && resident.pause > 0) {
+          resident.pause -= dt;
+        } else {
+          const pace = resident.mode === "roam" ? 1 : 1.5;
+          resident.x += Math.cos(resident.angle) * resident.speed * pace * dt;
+          resident.y += Math.sin(resident.angle) * resident.speed * pace * dt;
+          if (resident.mode === "roam") {
+            if (Math.random() < dt * 0.45) resident.angle += (Math.random() - 0.5) * 1.2;
+            if (Math.random() < dt * 0.12) resident.pause = 0.4 + Math.random() * 1.2;
+          }
+        }
+        if (resident.mode === "entering") {
+          const inside = resident.x > margin && resident.x < width - margin && resident.y > TOP && resident.y < height - margin;
+          if (inside) resident.mode = "roam";
+        } else if (resident.mode === "exiting") {
+          const out = resident.x < -EDGE || resident.x > width + EDGE || resident.y < -EDGE || resident.y > height + EDGE;
+          if (out) {
+            resident.mode = "off";
+            resident.el.hidden = true;
+            resident.el.classList.remove("walking");
+            return;
+          }
+        } else {
+          if (resident.x < margin || resident.x > width - margin) {
+            resident.angle = Math.PI - resident.angle;
+            resident.x = Math.max(margin, Math.min(width - margin, resident.x));
+          }
+          if (resident.y < TOP || resident.y > height - margin) {
+            resident.angle = -resident.angle;
+            resident.y = Math.max(TOP, Math.min(height - margin, resident.y));
+          }
+        }
+        resident.el.style.left = `${resident.x}px`;
+        resident.el.style.top = `${resident.y}px`;
+        resident.el.classList.toggle("walking", !resident.chatWith && (resident.mode !== "roam" || resident.pause <= 0));
+      }
+
+      let clockSeconds = 0;
+      let hourPending = false;
+
+      function stepClock(dt) {
+        if (hourPending) return;
+        clockSeconds += dt;
+        if (clockSeconds < 10) return;
+        clockSeconds = 0;
+        hourPending = true;
+        fetch("/hours", { method: "POST" })
+          .then((response) => response.json())
+          .then((result) => {
+            if (!result.state) return;
+            const before = world?.sam.energy;
+            showStats(result.state);
+            if (before !== undefined && result.state.sam.energy < before) {
+              floatDelta(energy, result.state.sam.energy - before);
+              if (result.state.sam.energy > 0) feedNote(`Sam is getting tired. −1 energy (${result.state.sam.energy}/${result.state.sam.energyMax} left).`);
+            }
+          })
+          .finally(() => {
+            hourPending = false;
+          });
+      }
+
+      placeResidents();
+      let last = performance.now();
+      function tick(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        const frozen = !(encounterId === null && !paused && !userPaused);
+        for (const actor of [player, ...residents]) if (frozen) actor.el.classList.remove("walking");
+        if (encounterId === null && !paused && !userPaused) {
+          stepPlayer(dt, width, height);
+          for (const resident of residents) stepResident(resident, dt, width, height);
+          manageCrowd(dt);
+          stepChats(dt);
+          stepClock(dt);
+          checkProximity();
+        }
+        moveNow();
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      let paused = false;
+      let userPaused = false;
+      const pauseButton = document.querySelector("#pause-game");
+      const pauseOverlay = document.querySelector("#pause-overlay");
+      const resumeButton = document.querySelector("#resume-game");
+
+      function setUserPaused(value) {
+        if (value && (encounterId !== null || paused)) return;
+        userPaused = value;
+        held.clear();
+        pauseOverlay.hidden = !value;
+        pauseButton.textContent = value ? "Resume" : "Pause";
+        refreshRoamChoices();
+        if (value) resumeButton.focus();
+      }
+      pauseButton.addEventListener("click", () => setUserPaused(!userPaused));
+      resumeButton.addEventListener("click", () => setUserPaused(false));
+
+      const endGame = document.querySelector("#end-game");
+      const endPopup = document.querySelector("#end-popup");
+      const endConfirm = document.querySelector("#end-confirm");
+      const endSummary = document.querySelector("#end-summary");
+      const endWhen = document.querySelector("#end-when");
+      const finalStats = document.querySelector("#final-stats");
+
+      endGame.addEventListener("click", () => {
+        if (encounterId !== null) return;
+        if (userPaused) setUserPaused(false);
+        paused = true;
+        held.clear();
+        endConfirm.hidden = false;
+        endSummary.hidden = true;
+        endPopup.querySelector(".popup-card").classList.remove("wide");
+        endPopup.hidden = false;
+      });
+      document.querySelector("#end-no").addEventListener("click", () => {
+        endPopup.hidden = true;
+        paused = false;
+      });
+      // Small-multiple line charts of Sam's month, one stat each (one series, one axis per chart).
+      const MONTH_CHARTS = [
+        { key: "happiness", label: "Happiness", color: "var(--happiness)", max: 100 },
+        { key: "health", label: "Health", color: "var(--health)", max: 100 },
+        { key: "hunger", label: "Hunger (fullness)", color: "#b86e12", max: 100 },
+        { key: "burnout", label: "Burnout", color: "#a0522d", max: 100 },
+        { key: "energy", label: "Energy", color: "var(--energy)", max: 5 },
+        { key: "money", label: "Money", color: "var(--money)", max: null, money: true },
+      ];
+
+      function hourLabel(t) {
+        const day = Math.floor(t / 24);
+        return `${dateText(day).replace("October", "Oct").replace("November", "Nov")}, ${clockText(t % 24).replace(":00", "")}`;
+      }
+
+      function sparkChart(points, spec) {
+        const W = 240;
+        const H = 72;
+        const pad = { l: 22, r: 4, t: 6, b: 14 };
+        const lastT = Math.max(24, points.at(-1).t);
+        const top = spec.max ?? Math.max(10, Math.ceil(Math.max(...points.map((p) => p[spec.key])) / 50) * 50);
+        const x = (t) => pad.l + (t / lastT) * (W - pad.l - pad.r);
+        const y = (v) => pad.t + (1 - v / top) * (H - pad.t - pad.b);
+        const ns = "http://www.w3.org/2000/svg";
+        const el = (name, attrs, parent) => {
+          const node = document.createElementNS(ns, name);
+          for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+          parent?.append(node);
+          return node;
+        };
+        const wrap = document.createElement("div");
+        wrap.className = "spark-chart";
+        const head = document.createElement("div");
+        head.className = "head";
+        const name = document.createElement("span");
+        name.textContent = spec.label;
+        const value = document.createElement("span");
+        const fmt = (v) => (spec.money ? `$${Math.round(v)}` : String(Math.round(v * 10) / 10));
+        value.textContent = `ended at ${fmt(points.at(-1)[spec.key])}`;
+        head.append(name, value);
+        const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${spec.label} over October, from ${fmt(points[0][spec.key])} to ${fmt(points.at(-1)[spec.key])}` });
+        const grid = el("g", { class: "grid" }, svg);
+        const axis = el("g", { class: "axis" }, svg);
+        for (const v of [0, top / 2, top]) {
+          el("line", { x1: pad.l, x2: W - pad.r, y1: y(v), y2: y(v) }, grid);
+          const label = el("text", { x: pad.l - 4, y: y(v) + 3, "text-anchor": "end" }, axis);
+          label.textContent = spec.money ? `$${v}` : String(v);
+        }
+        for (const day of [0, 7, 14, 21, 28]) {
+          if (day * 24 > lastT) continue;
+          const label = el("text", { x: x(day * 24), y: H - 2, "text-anchor": "middle" }, axis);
+          label.textContent = `Oct ${day + 1}`;
+        }
+        const d = points.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p[spec.key]).toFixed(1)}`).join("");
+        el("path", { d, class: "line", stroke: spec.color }, svg);
+        const cross = el("line", { class: "cross", y1: pad.t, y2: H - pad.b, visibility: "hidden" }, svg);
+        const dot = el("circle", { r: 4, fill: spec.color, stroke: "var(--paper)", "stroke-width": 2, visibility: "hidden" }, svg);
+        const hit = el("rect", { class: "hit", x: pad.l, y: 0, width: W - pad.l - pad.r, height: H }, svg);
+        const tip = document.createElement("span");
+        tip.className = "tip";
+        tip.hidden = true;
+        const show = (event) => {
+          const box = svg.getBoundingClientRect();
+          const t = ((event.clientX - box.left) / box.width * W - pad.l) / (W - pad.l - pad.r) * lastT;
+          let best = points[0];
+          for (const p of points) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+          cross.setAttribute("x1", x(best.t));
+          cross.setAttribute("x2", x(best.t));
+          dot.setAttribute("cx", x(best.t));
+          dot.setAttribute("cy", y(best[spec.key]));
+          cross.setAttribute("visibility", "visible");
+          dot.setAttribute("visibility", "visible");
+          tip.hidden = false;
+          tip.textContent = `${hourLabel(best.t)} · ${fmt(best[spec.key])}`;
+          tip.style.left = `${(x(best.t) / W) * 100}%`;
+        };
+        hit.addEventListener("pointermove", show);
+        hit.addEventListener("pointerleave", () => {
+          cross.setAttribute("visibility", "hidden");
+          dot.setAttribute("visibility", "hidden");
+          tip.hidden = true;
+        });
+        wrap.append(head, svg, tip);
+        return wrap;
+      }
+
+      // ---- Recap tabs ----
+      const tabButtons = [...document.querySelectorAll('.tabs [role="tab"]')];
+      function selectTab(name) {
+        for (const button of tabButtons) {
+          const on = button.dataset.tab === name;
+          button.setAttribute("aria-selected", String(on));
+          button.tabIndex = on ? 0 : -1;
+          document.querySelector(`#panel-${button.dataset.tab}`).hidden = !on;
+        }
+      }
+      for (const button of tabButtons) {
+        button.addEventListener("click", () => selectTab(button.dataset.tab));
+        button.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          const index = tabButtons.indexOf(button);
+          const next = tabButtons[(index + (event.key === "ArrowRight" ? 1 : tabButtons.length - 1)) % tabButtons.length];
+          selectTab(next.dataset.tab);
+          next.focus();
+          event.preventDefault();
+          event.stopPropagation();
+        });
+      }
+
+      function make(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      const TONE_LABEL = { good: "Paid off", bad: "Cost Sam", mixed: "Trade-off", neutral: "Led to" };
+      const toneLabel = (tone) => withPlayer(TONE_LABEL[tone] ?? "Led to");
+      const TONE_MARK = { good: "✓", bad: "!", mixed: "~", neutral: "•" };
+
+      function renderRecap(recap) {
+        const style = document.querySelector("#end-style");
+        style.replaceChildren(make("strong", "", recap.decisions.style.name), ` · ${recap.decisions.style.line}`);
+        style.hidden = false;
+
+        const highlights = document.querySelector("#recap-highlights");
+        highlights.replaceChildren(
+          ...(recap.highlights.length ? recap.highlights : [{ because: "kept it low-key", effect: "Nothing big happened yet. Play longer to build a story.", tone: "neutral" }]).map((item) => {
+            const li = make("li", item.tone);
+            const cause = make("div", "cause");
+            cause.append(make("b", "", "Because you"), item.because);
+            const effect = make("div", "effect");
+            effect.append(make("b", "", toneLabel(item.tone)), item.effect.charAt(0).toUpperCase() + item.effect.slice(1));
+            li.append(cause, make("span", "arrow", "→"), effect);
+            li.setAttribute("aria-label", `Because you ${item.because}, ${item.effect}`);
+            return li;
+          }),
+        );
+
+        const s = recap.impactSummary;
+        document.querySelector("#impact-summary").textContent =
+          `${playerName()} left ${s.better} ${s.better === 1 ? "person" : "people"} better off, ${s.worse} worse off, and ${s.same} about the same.`;
+        const people = [...recap.impact].sort((a, b) => (b.talk + b.busy + b.ignore) - (a.talk + a.busy + a.ignore) || Math.abs(b.moodAfter - b.moodBefore) - Math.abs(a.moodAfter - a.moodBefore));
+        document.querySelector("#recap-impact").replaceChildren(
+          ...people.map((person) => {
+            const card = make("article", "person-card");
+            const header = make("header");
+            const dot = make("span", "dot");
+            dot.style.background = person.color;
+            const names = make("div");
+            names.append(make("div", "who", person.name), make("div", "role", person.role));
+            header.append(dot, names);
+            const change = person.moodAfter - person.moodBefore;
+            const mood = make("p", "mood");
+            mood.append(`Mood ${person.moodBefore} → ${person.moodAfter} `);
+            if (change !== 0) mood.append(make("span", change > 0 ? "up" : "down", `${change > 0 ? "▲ +" : "▼ "}${change}`));
+            const counts = make("p", "", `Talked ${person.talk} · Ate together ${person.hangout ?? 0} · Busy ${person.busy} · Ignored ${person.ignore}`);
+            card.append(header, make("span", "verdict", person.verdict), mood, counts);
+            if (person.biggest) {
+              card.append(make("p", "", `Biggest effect: ${person.biggest.title} (${person.biggest.change > 0 ? "+" : ""}${person.biggest.change})`));
+            }
+            return card;
+          }),
+        );
+
+        const d = recap.decisions;
+        const decisions = document.querySelector("#recap-decisions");
+        const left = make("div");
+        const timeSection = make("section");
+        timeSection.append(make("h4", "", withPlayer("How Sam spent waking hours")));
+        const awake = d.hoursBy.filter((c) => c.name !== "Rest");
+        const maxHours = Math.max(1, ...awake.map((c) => c.hours));
+        const bars = make("div", "time-bars");
+        for (const category of awake) {
+          const row = make("div", "time-bar");
+          const track = make("span", "track");
+          const fill = make("span", "fill");
+          fill.style.width = `${(category.hours / maxHours) * 100}%`;
+          track.append(fill);
+          row.title = `${category.name}: ${category.hours} hours over ${category.count} choices`;
+          row.append(make("span", "", category.name), track, make("span", "val", `${category.hours}h`));
+          bars.append(row);
+        }
+        timeSection.append(bars, make("p", "panel-intro", `${d.choices} choices in all, plus ${d.nights} night${d.nights === 1 ? "" : "s"} of sleep and ${d.naps} nap${d.naps === 1 ? "" : "s"}.`));
+        const insightSection = make("section");
+        insightSection.append(make("h4", "", "What stands out"));
+        const list = make("ul", "insights");
+        for (const item of d.insights) {
+          const li = make("li", item.tone);
+          li.append(make("span", "mark", TONE_MARK[item.tone] ?? "•"), make("span", "", item.text));
+          list.append(li);
+        }
+        insightSection.append(list);
+        left.append(timeSection, insightSection);
+        const right = make("div");
+        const favorites = make("section");
+        favorites.append(make("h4", "", "Most-picked choices"));
+        const favList = make("ol", "mini-list");
+        for (const fav of d.favorites) favList.append(make("li", "", `${fav.title} (${fav.n}×)`));
+        favorites.append(favList);
+        const money = make("section");
+        money.append(make("h4", "", "Money"), make("p", "", `Earned $${d.earned}, spent $${d.spent}.`));
+        const skills = make("section");
+        skills.append(make("h4", "", "Soft skills gained"));
+        const skillList = make("ul", "mini-list");
+        for (const skill of d.skillsGained) skillList.append(make("li", "", `${skill.label} +${skill.gained}`));
+        if (d.skillsGained.length === 0) skillList.append(make("li", "", "None this month."));
+        skills.append(skillList);
+        right.append(favorites, money, skills);
+        decisions.replaceChildren(left, right);
+
+        const memories = document.querySelector("#recap-memories");
+        memories.replaceChildren(
+          ...(recap.memories.length ? recap.memories : [{ when: "", kind: "", text: "No memories yet.", because: "" }]).map((memory) => {
+            const li = make("li", memory.kind);
+            const body = make("div");
+            body.append(make("span", "what", memory.text));
+            if (memory.because) body.append(make("span", "why", `after ${playerName()} ${memory.because}`));
+            li.append(make("span", "when", memory.when), body);
+            return li;
+          }),
+        );
+      }
+
+      async function showRecap() {
+        selectTab("overview");
+        document.querySelector("#end-style").hidden = true;
+        try {
+          renderRecap(await (await fetch("/recap")).json());
+        } catch {
+          document.querySelector("#recap-highlights").replaceChildren(make("li", "neutral", "Couldn't load the recap."));
+        }
+      }
+
+      async function showMonthCharts() {
+        const grid = document.querySelector("#month-grid");
+        const source = document.querySelector("#month-source");
+        grid.replaceChildren();
+        source.textContent = "Loading…";
+        try {
+          const result = await (await fetch("/history")).json();
+          const points = (result.points ?? []).filter((p) => p && typeof p.t === "number");
+          if (points.length < 2) {
+            source.textContent = "Not enough of the month played to chart yet.";
+            return;
+          }
+          source.textContent = result.source === "tiger"
+            ? "Hour by hour, from Tiger Data (TimescaleDB, 3-hour buckets). Hover a chart for exact values."
+            : "Hour by hour, from this game's save. Connect Tiger Data to keep the history in a database.";
+          grid.replaceChildren(...MONTH_CHARTS.map((spec) => sparkChart(points, spec)));
+        } catch {
+          source.textContent = "Couldn't load the month's history.";
+        }
+      }
+
+      let gameOverShown = false;
+      function showGameOver(message) {
+        message = withPlayer(message);
+        gameOverShown = true;
+        feedNote(message, "day");
+        paused = true;
+        held.clear();
+        popup.hidden = true;
+        encounterId = null;
+        const sam = world.sam;
+        endWhen.textContent = message;
+        finalStats.replaceChildren(
+          ...[
+            ["Health", `${sam.health}/100`],
+            ["Hunger", `${sam.hunger}/100`],
+            ["Happiness", `${sam.happiness}/100`],
+            ["Money", `$${sam.money}`],
+            ["Energy", `${sam.energy}/${sam.energyMax}`],
+            ["Burnout", `${sam.burnout ?? 0}/100`],
+            ...Object.entries(skillNames).map(([id, label]) => [label, `${sam.skills?.[id] ?? 0}/100`]),
+            ...Object.entries(sam.interests ?? {})
+              .filter(([, value]) => value > 0)
+              .sort((a, b) => b[1] - a[1])
+              .map(([id, value]) => [`${interestNames[id] ?? id} (interest)`, `${value}/100, ${proficiency(value)}`]),
+          ].map(([label, value]) => {
+            const row = document.createElement("div");
+            const dt = document.createElement("dt");
+            const dd = document.createElement("dd");
+            dt.textContent = label;
+            dd.textContent = value;
+            row.append(dt, dd);
+            return row;
+          }),
+        );
+        endConfirm.hidden = true;
+        endSummary.hidden = false;
+        endPopup.querySelector(".popup-card").classList.add("wide");
+        endPopup.hidden = false;
+        endGame.disabled = true;
+        void showMonthCharts();
+        void showRecap();
+      }
+      document.querySelector("#end-yes").addEventListener("click", () => {
+        showGameOver(`Sam's run ended on ${weekdayText(world.time.day)}, ${dateText(world.time.day)} at ${clockText(world.time.hour)}.`);
+      });
+      document.querySelector("#new-game").addEventListener("click", async () => {
+        const result = await fetch("/reset", { method: "POST" }).then((response) => response.json());
+        if (result.events) events = result.events;
+        if (result.meetings) {
+          meetings = result.meetings;
+          buildResidents();
+        }
+        builtDay = null;
+        knownPassions = null;
+        cooled.clear();
+        placeResidents();
+        lastHour = null;
+        clockSeconds = 0;
+        world = undefined;
+        gameOverShown = false;
+        shownDay = null;
+        lastInterests = null;
+        lastSkills = null;
+        if (result.state) showStats(result.state);
+        if (result.state) {
+          populateNow();
+          resetFeed(result.state.gameId);
+          dropDay(result.state.time.day);
+          feedNote("A new October begins.", "world");
+          feedNewDay(result.state);
+        }
+        endGame.disabled = false;
+        endPopup.hidden = true;
+        paused = false;
+      });
+      window.addEventListener("resize", () => {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        player.x = Math.max(36, Math.min(width - 36, player.x));
+        player.y = Math.max(36, Math.min(height - 36, player.y));
+        for (const resident of residents) {
+          if (resident.mode !== "roam") continue;
+          resident.x = Math.max(36, Math.min(width - 36, resident.x));
+          resident.y = Math.max(36, Math.min(height - 36, resident.y));
+        }
+      });
+      window.addEventListener("keydown", (event) => {
+        const name = event.key.toLowerCase();
+        if (encounterId !== null && /^[1-9]$/.test(event.key)) {
+          const button = popupOptions.querySelectorAll("button")[Number(event.key) - 1];
+          if (button !== undefined && !button.disabled) button.click();
+          event.preventDefault();
+          return;
+        }
+        if (name === "p" || (name === "escape" && userPaused)) {
+          if (event.target instanceof HTMLInputElement) return;
+          setUserPaused(!userPaused);
+          event.preventDefault();
+          return;
+        }
+        if (userPaused) return;
+        if (keyDir[name] === undefined) return;
+        held.add(name);
+        event.preventDefault();
+      });
+      window.addEventListener("keyup", (event) => {
+        held.delete(event.key.toLowerCase());
+      });
+      window.addEventListener("blur", () => held.clear());
+      // Every time the app is opened, start a fresh game (new player, names and stats), then load it.
+      fetch("/reset", { method: "POST" })
+        .catch(() => {})
+        .then(() => fetch("/state"))
+        .then((response) => response.json())
+        .then((result) => {
+          events = result.events ?? {};
+          meetings = result.meetings ?? {};
+          buildResidents();
+          if (result.calendar) calendar = result.calendar;
+          skillNames = result.skills ?? {};
+          interestNames = result.interests ?? {};
+          weatherNames = result.weather ?? {};
+          if (typeof result.burnoutLimit === "number") burnoutLimit = result.burnoutLimit;
+          if (typeof result.strainLimit === "number") strainLimit = result.strainLimit;
+          solanaOn = result.solana?.enabled === true;
+          occupations = result.occupations ?? {};
+          const saved = loadSavedFeed(result.state.gameId);
+          feedGameId = result.state.gameId;
+          if (saved !== null && saved.length > 0) restoreFeed(saved);
+          showStats(result.state);
+          populateNow();
+          if (saved !== null && saved.length > 0) {
+            feedNote(`Welcome back. It's ${weekdayText(result.state.time.day)}, ${clockText(result.state.time.hour)}.`);
+          } else if (!result.state.over) {
+            dropDay(result.state.time.day);
+            feedNewDay(result.state);
+            feedNote(`It's ${clockText(result.state.time.hour)}. Walk Sam with the arrow keys or WASD.`);
+          }
+        });
+    </script>
+  </body>
+</html>
