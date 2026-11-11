@@ -7,22 +7,15 @@ Inspiration:
 - Conversation with a Friend where "Impact on others/Inspiration" came up 
 - Solana -> Transactions
 - Heard about a past hackathon project that used multiple agents in a sandbox game
-- Recently personally learning about quiet dissatisification
 
 Core Ideas:
 - Butterfly Effect
 - People often don't realize the impact they have on other people because they don't say it to each other
 
 Milestones:
-
-1: Getting the agents to interact with each other
-
-WIP:
+:Getting the agents to interact with each other
 : Constructing a backend with info
 : Construct a frontend to display such info
 : DB started
-
-
-Not Started:
 : Give agents different personalities
 : Give agents different values/connect with predetermined tools
