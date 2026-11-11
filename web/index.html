@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Saturday afternoon</title>
+    <title>College Experience</title>
     <style>
       :root {
         color-scheme: light;
@@ -44,15 +44,62 @@
           #f7f3ec;
         background-size: 28px 28px;
       }
-      .scene {
+      .daybar {
         position: absolute;
         z-index: 1;
         top: 0.7rem;
         left: 0.85rem;
-        margin: 0;
-        max-width: 28rem;
-        line-height: 1.35;
-        font-size: 0.95rem;
+        right: 0.85rem;
+        pointer-events: none;
+      }
+      .timeline {
+        position: relative;
+        height: 0.9rem;
+        border: 2px solid var(--ink);
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          #141a33 0%,
+          #1f2a52 20%,
+          #e9a07a 27%,
+          #9ccbe8 37%,
+          #d8eefa 50%,
+          #9ccbe8 63%,
+          #e88a6a 76%,
+          #2a2f5c 84%,
+          #141a33 100%
+        );
+      }
+      .now {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 0.95rem;
+        height: 0.95rem;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid var(--ink);
+        transform: translate(-50%, -50%);
+      }
+      .ticks {
+        position: relative;
+        height: 0.9rem;
+        margin-top: 0.2rem;
+        font-size: 0.7rem;
+        color: #6d675f;
+      }
+      .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+      .ticks span:first-child { transform: none; }
+      .ticks span:last-child { transform: translateX(-100%); }
+      .day { margin: 0.15rem 0 0; font-size: 1.35rem; }
+      .scene { margin: 0.1rem 0 0; font-size: 0.85rem; color: #6d675f; }
+      .end-game {
+        position: absolute;
+        z-index: 1;
+        right: 0.85rem;
+        bottom: 0.85rem;
+        padding: 0.45rem 0.8rem;
+        font-size: 0.92rem;
       }
       .sandbox { position: absolute; inset: 0; }
       .popup {
@@ -137,7 +184,7 @@
         grid-template-rows: auto 1fr;
         column-gap: 0.8rem;
       }
-      .player h2 { grid-column: 1; grid-row: 1; align-self: start; }
+      .player > .icon { grid-column: 1; grid-row: 1; align-self: start; }
       .stats {
         grid-column: 1;
         grid-row: 2;
@@ -146,44 +193,69 @@
         flex-direction: column;
         gap: 0.35rem;
       }
-      .stat { display: flex; justify-content: space-between; gap: 1rem; }
-      .stat dt, .stat dd { margin: 0; font-size: 1.05rem; }
-      .stat dd { font-variant-numeric: tabular-nums; }
-      .clock {
-        position: absolute;
-        z-index: 1;
-        top: 0.7rem;
-        right: 0.85rem;
-        margin: 0;
-        font-size: 1.35rem;
+      .stat {
+        display: grid;
+        grid-template-columns: 5.4rem minmax(0, 1fr);
+        align-items: center;
+        gap: 0.6rem;
       }
+      .stat dt, .stat dd { margin: 0; font-size: 1.05rem; }
+      .stat dd {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .bar {
+        flex: 1;
+        height: 0.7rem;
+        border: 1.5px solid currentColor;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .bar .fill {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: currentColor;
+        transition: width 0.3s ease;
+      }
+      .pips { flex: 1; display: flex; gap: 0.2rem; }
+      .pip {
+        flex: 1;
+        height: 0.7rem;
+        border: 1.5px solid currentColor;
+        border-radius: 3px;
+        background: #fff;
+      }
+      .pip.on { background: currentColor; }
+      .num { min-width: 2.6rem; text-align: right; font-size: 0.85rem; }
+      .final-stats { margin: 0 0 1rem; display: flex; flex-direction: column; gap: 0.3rem; }
+      .final-stats div { display: flex; justify-content: space-between; }
+      .final-stats dt, .final-stats dd { margin: 0; }
       .health { color: var(--health); }
       .hunger { color: #b86e12; }
+      .stat.money dd { font-size: 1.05rem; }
       .happiness { color: var(--happiness); }
       .money { color: var(--money); }
       .energy { color: var(--energy); }
-      .side {
-        grid-column: 2;
-        grid-row: 1 / span 2;
-        display: flex;
-        flex-direction: column;
-        gap: 0.55rem;
-        min-height: 0;
-      }
       .icon, .inventory {
         border: 2px solid var(--line);
         border-radius: 10px;
         background: #fff;
       }
       .icon {
-        height: 4.6rem;
-        display: grid;
-        place-items: center;
-        gap: 0.1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.45rem 0.75rem;
       }
-      .icon span { font-size: 0.72rem; }
+      .icon svg { flex: none; }
+      .icon span { font-size: 1.2rem; }
       .inventory {
-        flex: 1;
+        grid-column: 2;
+        grid-row: 1 / span 2;
         min-height: 6.5rem;
         display: grid;
         place-items: center;
@@ -232,8 +304,21 @@
   </head>
   <body>
     <section class="game" aria-label="Game">
-      <p class="scene">Saturday morning. Arrow keys or WASD move Sam.</p>
-      <p class="clock" id="clock">7:00 AM</p>
+      <div class="daybar">
+        <div class="timeline" id="clock" role="meter" aria-label="Time of day" aria-valuemin="0" aria-valuemax="24" aria-valuenow="7" aria-valuetext="7:00 AM">
+          <span class="now" id="now"></span>
+        </div>
+        <div class="ticks" aria-hidden="true">
+          <span style="left: 0%">12 AM</span>
+          <span style="left: 25%">6 AM</span>
+          <span style="left: 50%">12 PM</span>
+          <span style="left: 75%">6 PM</span>
+          <span style="left: 100%">12 AM</span>
+        </div>
+        <p class="day" id="day">Monday</p>
+        <p class="scene">Arrow keys or WASD move Sam.</p>
+      </div>
+      <button class="end-game" id="end-game" type="button">End game early</button>
       <div class="sandbox" id="sandbox">
         <div class="actor player-token" id="sam">
           <span class="dot"></span>
@@ -257,24 +342,21 @@
     </aside>
     <div class="dock">
       <section class="player" aria-label="Player">
-        <h2>Player</h2>
+        <h2 class="icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#1c1915" stroke-width="1.6" aria-hidden="true">
+            <circle cx="14" cy="8" r="3.2"></circle>
+            <path d="M7 23c.8-4.2 3.2-6.2 7-6.2S20.2 18.8 21 23"></path>
+          </svg>
+          <span id="player-name">Sam</span>
+        </h2>
         <dl class="stats">
-          <div class="stat health"><dt>Health</dt><dd id="health">80</dd></div>
-          <div class="stat hunger"><dt>Hunger</dt><dd id="hunger">20</dd></div>
-          <div class="stat happiness"><dt>Happiness</dt><dd id="happiness">50</dd></div>
+          <div class="stat health"><dt>Health</dt><dd id="health"><span class="bar" role="meter" aria-label="Health" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat hunger"><dt>Hunger</dt><dd id="hunger"><span class="bar" role="meter" aria-label="Hunger" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
+          <div class="stat happiness"><dt>Happiness</dt><dd id="happiness"><span class="bar" role="meter" aria-label="Happiness" aria-valuemin="0" aria-valuemax="100"><span class="fill"></span></span><span class="num"></span></dd></div>
           <div class="stat money"><dt>Money</dt><dd id="money">$40</dd></div>
-          <div class="stat energy"><dt>Energy</dt><dd id="energy">3/3</dd></div>
+          <div class="stat energy"><dt>Energy</dt><dd id="energy"><span class="pips" role="meter" aria-label="Energy" aria-valuemin="0"></span><span class="num"></span></dd></div>
         </dl>
-        <div class="side">
-          <div class="icon" aria-hidden="true">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#1c1915" stroke-width="1.6">
-              <circle cx="14" cy="8" r="3.2"></circle>
-              <path d="M7 23c.8-4.2 3.2-6.2 7-6.2S20.2 18.8 21 23"></path>
-            </svg>
-            <span>Sam</span>
-          </div>
-          <div class="inventory">Inventory</div>
-        </div>
+        <div class="inventory">Inventory</div>
       </section>
       <section class="choices" aria-label="Choices">
         <h2>Choices</h2>
@@ -301,6 +383,26 @@
         </div>
       </div>
     </div>
+    <div class="popup" id="end-popup" hidden>
+      <div class="popup-card" role="dialog" aria-modal="true" aria-labelledby="end-title">
+        <div id="end-confirm">
+          <h2 id="end-title">End the game early?</h2>
+          <p>The day stops here and you see how Sam did.</p>
+          <div class="choice-list">
+            <button id="end-yes" type="button"><strong>End game</strong><span>See the final stats</span></button>
+            <button id="end-no" type="button"><strong>Keep playing</strong><span>Back to the day</span></button>
+          </div>
+        </div>
+        <div id="end-summary" hidden>
+          <h2>Game over</h2>
+          <p id="end-when"></p>
+          <dl class="final-stats" id="final-stats"></dl>
+          <div class="choice-list">
+            <button id="new-game" type="button"><strong>Start a new game</strong><span>Back to Monday morning</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
     <script>
       const careerFair = document.querySelector("#career-fair");
       const nap = document.querySelector("#nap");
@@ -316,24 +418,66 @@
 
       let world;
 
-      function showClock(hour) {
+      const now = document.querySelector("#now");
+      const dayLabel = document.querySelector("#day");
+      const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+      function clockText(hour) {
         const suffix = hour >= 12 ? "PM" : "AM";
         const shown = hour % 12 === 0 ? 12 : hour % 12;
-        clock.textContent = `${shown}:00 ${suffix}`;
+        return `${shown}:00 ${suffix}`;
+      }
+
+      function showClock(hour, day) {
+        clock.setAttribute("aria-valuenow", String(hour));
+        clock.setAttribute("aria-valuetext", clockText(hour));
+        dayLabel.textContent = DAYS[(day ?? 0) % 7];
+      }
+
+      function moveNow() {
+        if (world === undefined) return;
+        const fraction = Math.min(1, clockSeconds / 10);
+        now.style.left = `${((world.time.hour + fraction) / 24) * 100}%`;
       }
 
       function canChooseFair(state) {
         return state.sam.energy >= 1 && state.sam.money >= 8;
       }
 
+      function showBar(el, value) {
+        const shown = Math.max(0, Math.min(100, value));
+        el.querySelector(".fill").style.width = `${shown}%`;
+        el.querySelector(".bar").setAttribute("aria-valuenow", String(shown));
+        el.querySelector(".num").textContent = `${shown}/100`;
+      }
+
+      function showEnergy(value, max) {
+        const pips = energy.querySelector(".pips");
+        if (pips.children.length !== max) {
+          pips.replaceChildren(
+            ...Array.from({ length: max }, () => {
+              const pip = document.createElement("span");
+              pip.className = "pip";
+              return pip;
+            }),
+          );
+        }
+        [...pips.children].forEach((pip, i) => pip.classList.toggle("on", i < value));
+        pips.setAttribute("aria-valuemax", String(max));
+        pips.setAttribute("aria-valuenow", String(value));
+        energy.querySelector(".num").textContent = `${value}/${max}`;
+      }
+
       function showStats(state) {
         world = state;
-        health.textContent = String(state.sam.health);
-        hunger.textContent = String(state.sam.hunger);
-        happiness.textContent = String(state.sam.happiness);
-        showClock(state.time.hour);
+        document.querySelector("#player-name").textContent = state.sam.fullName ?? state.sam.name;
+        showBar(health, state.sam.health);
+        showBar(hunger, state.sam.hunger);
+        showBar(happiness, state.sam.happiness);
+        showClock(state.time.hour, state.time.day);
+        passHours(state.time.hour);
         money.textContent = `$${state.sam.money}`;
-        energy.textContent = `${state.sam.energy}/${state.sam.energyMax}`;
+        showEnergy(state.sam.energy, state.sam.energyMax);
         careerFair.disabled = !canChooseFair(state);
       }
 
@@ -408,6 +552,39 @@
       };
       let encounterId = null;
       const cooled = new Set();
+      const AWAY_HOURS = 3;
+      let lastHour = null;
+
+      function returnResident(resident) {
+        const width = sandbox.clientWidth;
+        const height = sandbox.clientHeight;
+        const margin = 36;
+        let x;
+        let y;
+        do {
+          x = margin + Math.random() * (width - margin * 2);
+          y = margin + Math.random() * (height - margin * 2);
+        } while (Math.hypot(x - player.x, y - player.y) < RELEASE && width > RELEASE * 2);
+        resident.x = x;
+        resident.y = y;
+        resident.angle = Math.random() * Math.PI * 2;
+        resident.pause = 0;
+        resident.gone = false;
+        resident.el.hidden = false;
+        cooled.delete(resident.id);
+      }
+
+      function passHours(hour) {
+        if (lastHour !== null && hour !== lastHour) {
+          const passed = (hour - lastHour + 24) % 24;
+          for (const resident of residents) {
+            if (!resident.gone) continue;
+            resident.awayHours -= passed;
+            if (resident.awayHours <= 0) returnResident(resident);
+          }
+        }
+        lastHour = hour;
+      }
 
       function startEncounter(id) {
         const meeting = meetings[id];
@@ -422,6 +599,7 @@
         const resident = residents.find((item) => item.id === encounterId);
         if (leaves && resident !== undefined) {
           resident.gone = true;
+          resident.awayHours = AWAY_HOURS;
           resident.el.hidden = true;
         } else if (resident !== undefined) {
           cooled.add(resident.id);
@@ -548,15 +726,78 @@
         last = now;
         const width = sandbox.clientWidth;
         const height = sandbox.clientHeight;
-        if (encounterId === null) {
+        if (encounterId === null && !paused) {
           stepPlayer(dt, width, height);
           for (const resident of residents) stepResident(resident, dt, width, height);
           stepClock(dt);
           checkProximity();
         }
+        moveNow();
         requestAnimationFrame(tick);
       }
       requestAnimationFrame(tick);
+
+      let paused = false;
+      const endGame = document.querySelector("#end-game");
+      const endPopup = document.querySelector("#end-popup");
+      const endConfirm = document.querySelector("#end-confirm");
+      const endSummary = document.querySelector("#end-summary");
+      const endWhen = document.querySelector("#end-when");
+      const finalStats = document.querySelector("#final-stats");
+
+      endGame.addEventListener("click", () => {
+        if (encounterId !== null) return;
+        paused = true;
+        held.clear();
+        endConfirm.hidden = false;
+        endSummary.hidden = true;
+        endPopup.hidden = false;
+      });
+      document.querySelector("#end-no").addEventListener("click", () => {
+        endPopup.hidden = true;
+        paused = false;
+      });
+      document.querySelector("#end-yes").addEventListener("click", () => {
+        const sam = world.sam;
+        endWhen.textContent = `Sam's run ended on ${DAYS[(world.time.day ?? 0) % 7]} at ${clockText(world.time.hour)}.`;
+        finalStats.replaceChildren(
+          ...[
+            ["Health", `${sam.health}/100`],
+            ["Hunger", `${sam.hunger}/100`],
+            ["Happiness", `${sam.happiness}/100`],
+            ["Money", `$${sam.money}`],
+            ["Energy", `${sam.energy}/${sam.energyMax}`],
+          ].map(([label, value]) => {
+            const row = document.createElement("div");
+            const dt = document.createElement("dt");
+            const dd = document.createElement("dd");
+            dt.textContent = label;
+            dd.textContent = value;
+            row.append(dt, dd);
+            return row;
+          }),
+        );
+        endConfirm.hidden = true;
+        endSummary.hidden = false;
+        endGame.disabled = true;
+      });
+      document.querySelector("#new-game").addEventListener("click", async () => {
+        const result = await fetch("/reset", { method: "POST" }).then((response) => response.json());
+        for (const resident of residents) {
+          resident.gone = false;
+          resident.el.hidden = false;
+        }
+        cooled.clear();
+        placeResidents();
+        lastHour = null;
+        clockSeconds = 0;
+        reply.textContent = "";
+        status.textContent = "Captain will answer here.";
+        if (result.state) showStats(result.state);
+        endGame.disabled = false;
+        endPopup.hidden = true;
+        paused = false;
+      });
       window.addEventListener("resize", () => {
         const width = sandbox.clientWidth;
         const height = sandbox.clientHeight;

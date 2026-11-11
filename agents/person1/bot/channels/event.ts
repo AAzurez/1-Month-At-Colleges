@@ -16,7 +16,7 @@ export default defineChannel({
         const earlier = body.memory ?? "No earlier decisions.";
         const stats = body.stats ?? "Stats were not included.";
         const session = await send(
-          `The player chose ${body.eventId}. What changed: ${body.summary}.\n${stats}\nEarlier decisions:\n${earlier}\nReact in character and keep the new consequence.`,
+          `The player chose ${body.eventId}. What changed: ${body.summary}.\n${stats}\nEarlier decisions:\n${earlier}\nReply to the player by their first name in one short, casual line, in character, using this game's names. Do not mention any numbers or list what changed.`,
           { continuationToken: `player:${body.playerId}` },
         );
         const outcome = await session.waitForCompletion();

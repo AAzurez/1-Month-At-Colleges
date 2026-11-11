@@ -32,9 +32,20 @@ async function getPool() {
     if (connectionString === "") {
       throw new Error("DATABASE_URL is missing. Add it to .env in the CollegeExperience folder.");
     }
-    pool = new pg.Pool({ connectionString });
+    // Managed databases such as Tiger Data use a certificate chain pg rejects under its strict
+    // sslmode=require. Ask for libpq's meaning instead: encrypted, without that chain check.
+    const fixed = /sslmode=(require|prefer)/.test(connectionString) && !connectionString.includes("uselibpqcompat")
+      ? connectionString.replace(/sslmode=(require|prefer)/, "uselibpqcompat=true&sslmode=$1")
+      : connectionString;
+    pool = new pg.Pool({ connectionString: fixed });
   }
   return pool;
+}
+
+// Runs any query on the shared pool (used by db/history.mjs).
+export async function dbQuery(text, params = []) {
+  const db = await getPool();
+  return db.query(text, params);
 }
 
 export async function saveChoice({ playerId, eventId, summary }) {

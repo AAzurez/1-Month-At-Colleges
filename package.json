@@ -1,6 +1,14 @@
 {
   "private": true,
+  "scripts": {
+    "start": "node web/server.mjs",
+    "db:setup": "node db/setup.mjs",
+    "solana:setup": "node solana/setup.mjs"
+  },
   "dependencies": {
+    "@solana/spl-token": "0.4.14",
+    "@solana/web3.js": "1.98.4",
+    "claude-code": "^1.0.0",
     "pg": "^8.23.1"
   }
 }

@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const statePath = join(dirname(fileURLToPath(import.meta.url)), "state.json");
+const ENERGY_MAX = 5;
+// Hunger is a fullness meter: 100 is full, 0 is starving.
 
 export const EVENTS = {
   career_fair: {
@@ -67,12 +69,39 @@ export const EVENTS = {
   },
 };
 
+// Who you can bump into on campus, and the choices each encounter offers.
+// eventId null means the choice stays on the page (no stat change, no agent call).
+// leaves: true sends the character away for a few hours after the choice.
+export const MEETINGS = {
+  captain: {
+    name: "Captain",
+    agent: "person1",
+    spiel: "Captain flags you down. Their morning was a stack of lab schedules, and they are still sore that the chemistry section went uncovered.",
+    options: [
+      { eventId: "captain_talk", label: "Talk to them", hint: "Stay and hear the rest", leaves: true },
+      { eventId: "captain_busy", label: "Kindly tell them you are busy", hint: "They head off", leaves: true },
+      { eventId: null, label: "Ignore", hint: "Keep walking", leaves: false },
+    ],
+  },
+  spark: {
+    name: "Spark",
+    agent: "person2",
+    spiel: "Spark catches your sleeve. They spent the afternoon pitching a last-minute club night, and they want to tell you how it went.",
+    options: [
+      { eventId: "spark_talk", label: "Talk to them", hint: "Stay and hear the rest", leaves: true },
+      { eventId: "spark_busy", label: "Kindly tell them you are busy", hint: "They head off", leaves: true },
+      { eventId: null, label: "Ignore", hint: "Keep walking", leaves: false },
+    ],
+  },
+};
+
 function startingState() {
   return {
-    time: { hour: 7 },
-    sam: { name: "Sam", health: 80, hunger: 20, happiness: 50, money: 40, energy: 3, energyMax: 3 },
-    person1: { name: "Captain", health: 90, hunger: 10, happiness: 50, money: 80 },
-    person2: { name: "Spark", health: 75, hunger: 35, happiness: 50, money: 15 },
+    hungerIsFullness: true,
+    time: { day: 0, hour: 7 },
+    sam: { name: "Sam", health: 80, hunger: 80, happiness: 50, money: 40, energy: ENERGY_MAX, energyMax: ENERGY_MAX },
+    person1: { name: "Captain", health: 90, hunger: 90, happiness: 50, money: 80 },
+    person2: { name: "Spark", health: 75, hunger: 65, happiness: 50, money: 15 },
   };
 }
 
@@ -85,8 +114,9 @@ export function formatClock(hour) {
 export function advanceHour(state) {
   const next = structuredClone(state);
   next.time.hour = (next.time.hour + 1) % 24;
+  if (next.time.hour === 0) next.time.day += 1;
   for (const id of ["sam", "person1", "person2"]) {
-    next[id].hunger = Math.min(100, next[id].hunger + 5);
+    next[id].hunger = Math.max(0, next[id].hunger - 5);
   }
   return next;
 }
@@ -99,13 +129,34 @@ export async function loadState() {
   try {
     const parsed = JSON.parse(await readFile(statePath, "utf8"));
     const base = startingState();
+    const oldHungerScale = parsed.hungerIsFullness !== true;
     for (const id of Object.keys(base)) {
+      if (typeof base[id] !== "object") continue;
       parsed[id] = { ...base[id], ...parsed[id] };
     }
+    if (oldHungerScale) {
+      for (const id of ["sam", "person1", "person2"]) {
+        parsed[id].hunger = 100 - parsed[id].hunger;
+      }
+      parsed.hungerIsFullness = true;
+    }
+    if (typeof parsed.time.day !== "number") parsed.time.day = 0;
+    parsed.sam.energyMax = ENERGY_MAX;
+    parsed.sam.energy = Math.min(parsed.sam.energy, ENERGY_MAX);
     return parsed;
   } catch {
     return startingState();
   }
+}
+
+export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+export function dayName(day) {
+  return DAYS[day % 7];
+}
+
+export function newGame() {
+  return startingState();
 }
 
 export async function saveState(state) {
@@ -142,9 +193,9 @@ export function applyEvent(state, eventId) {
 
 export function formatStats(state) {
   return [
-    `Time ${formatClock(state.time.hour)}.`,
-    `Sam health ${state.sam.health}, hunger ${state.sam.hunger}, happiness ${state.sam.happiness}, money $${state.sam.money}, energy ${state.sam.energy}/${state.sam.energyMax}.`,
-    `Captain health ${state.person1.health}, hunger ${state.person1.hunger}, happiness ${state.person1.happiness}, money $${state.person1.money}.`,
-    `Spark health ${state.person2.health}, hunger ${state.person2.hunger}, happiness ${state.person2.happiness}, money $${state.person2.money}.`,
+    `${dayName(state.time.day)}, ${formatClock(state.time.hour)}.`,
+    `Sam health ${state.sam.health}, hunger ${state.sam.hunger}/100 full, happiness ${state.sam.happiness}, money $${state.sam.money}, energy ${state.sam.energy}/${state.sam.energyMax}.`,
+    `Captain health ${state.person1.health}, hunger ${state.person1.hunger}/100 full, happiness ${state.person1.happiness}, money $${state.person1.money}.`,
+    `Spark health ${state.person2.health}, hunger ${state.person2.hunger}/100 full, happiness ${state.person2.happiness}, money $${state.person2.money}.`,
   ].join(" ");
 }

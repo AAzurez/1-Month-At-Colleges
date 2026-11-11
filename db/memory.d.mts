@@ -24,3 +24,4 @@ export function listMemories(playerId: string): Promise<
 export function formatMemories(
   memories: Array<{ eventId: string; caused: string; notes: string }>,
 ): string;
+export function dbQuery(text: string, params?: unknown[]): Promise<{ rows: any[] }>;
